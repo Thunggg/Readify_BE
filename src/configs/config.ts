@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsString, validateSync } from 'class-validator';
+import { IsString, validateSync, IsOptional } from 'class-validator';
 import fs from 'fs';
 import path from 'path';
 import { config } from 'dotenv';
@@ -13,20 +13,29 @@ if (!fs.existsSync(path.resolve('.env'))) {
 }
 
 class ConfigSchema {
+  @IsOptional()
   @IsString()
-  DATABASE_URL: string;
+  DATABASE_URL?: string;
 
+  @IsOptional()
   @IsString()
-  ACCESS_TOKEN_SECRET: string;
+  MONGO_URI?: string;
 
+  @IsOptional()
   @IsString()
-  REFRESH_TOKEN_SECRET: string;
+  ACCESS_TOKEN_SECRET?: string;
 
+  @IsOptional()
   @IsString()
-  ACCESS_TOKEN_EXPIRES_IN: string;
+  REFRESH_TOKEN_SECRET?: string;
 
+  @IsOptional()
   @IsString()
-  REFRESH_TOKEN_EXPIRES_IN: string;
+  ACCESS_TOKEN_EXPIRES_IN?: string;
+
+  @IsOptional()
+  @IsString()
+  REFRESH_TOKEN_EXPIRES_IN?: string;
 }
 const configServer = plainToInstance(ConfigSchema, process.env);
 const e = validateSync(configServer);
