@@ -23,8 +23,8 @@ export default () => ({
     refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN,
   },
 
-  //   throttler: {
-  //     ttl: 0,
-  //     limit: 10,
-  //   }, // 1 user được gửi 10 request trong 60s
+  // Bcrypt
+  bcrypt: {
+    saltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
+  },
 });

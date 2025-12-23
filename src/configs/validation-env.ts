@@ -8,4 +8,5 @@ export const validateEnv = Joi.object({
   REFRESH_TOKEN_EXPIRES_IN: Joi.string().required(),
   PORT: Joi.number().required(),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').required(),
+  BCRYPT_SALT_ROUNDS: Joi.number().required(),
 });
