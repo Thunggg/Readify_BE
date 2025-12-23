@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsArray, IsEmail, IsOptional, IsString, validateSync } from 'class-validator';
+import { IsArray, IsEmail, IsOptional, IsString, IsBoolean, validateSync } from 'class-validator';
 
 export class SupplierSchema {
   @IsOptional()
@@ -29,6 +29,10 @@ export class SupplierSchema {
   @IsArray()
   @IsString({ each: true })
   bookIds?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  delete_flag?: boolean;
 }
 
 export function validateSupplier(obj: unknown): { valid: boolean; errors?: any[]; value?: SupplierSchema } {

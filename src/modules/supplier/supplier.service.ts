@@ -30,25 +30,21 @@ export class SupplierService implements OnModuleInit, OnModuleDestroy {
   }
 
   async create(dto: CreateSupplierDto) {
-    const res = await this.collection.insertOne({ ...dto });
-    return { _id: res.insertedId.toHexString(), ...dto };
+    const doc = { ...dto, delete_flag: false, createdAt: new Date() };
+    const res = await this.collection.insertOne(doc);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return { _id: res.insertedId.toHexString(), ...doc };
   }
 
   async findAll(): Promise<any[]> {
-    return this.collection.find().toArray();
+    return this.collection.find({ delete_flag: { $ne: true } }).toArray();
   }
 
   async search(q: string | undefined, page = 1, limit = 10) {
     const filter: any = {};
     if (q && q.trim().length > 0) {
       const re = new RegExp(q.trim(), 'i');
-      filter.$or = [
-        { name: re },
-        { contactName: re },
-        { email: re },
-        { phone: re },
-        { address: re },
-      ];
+      filter.$or = [{ name: re }, { contactName: re }, { email: re }, { phone: re }, { address: re }];
     }
 
     const skip = Math.max(0, page - 1) * limit;
@@ -67,7 +63,7 @@ export class SupplierService implements OnModuleInit, OnModuleDestroy {
     } catch {
       throw new NotFoundException('Invalid id');
     }
-    const doc = await this.collection.findOne({ _id });
+    const doc = await this.collection.findOne({ _id, delete_flag: { $ne: true } });
     if (!doc) throw new NotFoundException('Supplier not found');
     return doc;
   }
@@ -79,7 +75,11 @@ export class SupplierService implements OnModuleInit, OnModuleDestroy {
     } catch {
       throw new NotFoundException('Invalid id');
     }
-    const res = await this.collection.findOneAndUpdate({ _id }, { $set: { ...dto } }, { returnDocument: 'after' });
+    const res = await this.collection.findOneAndUpdate(
+      { _id, delete_flag: { $ne: true } },
+      { $set: { ...dto } },
+      { returnDocument: 'after' },
+    );
     if (!res.value) throw new NotFoundException('Supplier not found');
     return res.value;
   }
@@ -91,7 +91,11 @@ export class SupplierService implements OnModuleInit, OnModuleDestroy {
     } catch {
       throw new NotFoundException('Invalid id');
     }
-    const res = await this.collection.findOneAndDelete({ _id });
+    const res = await this.collection.findOneAndUpdate(
+      { _id, delete_flag: { $ne: true } },
+      { $set: { delete_flag: true, deletedAt: new Date() } },
+      { returnDocument: 'after' },
+    );
     if (!res.value) throw new NotFoundException('Supplier not found');
     return { deleted: true };
   }
