@@ -14,7 +14,7 @@ if (!fs.existsSync(path.resolve('.env'))) {
 
 class ConfigSchema {
   @IsString()
-  DATABASE_URL: string;
+  MONGODB_URI: string;
 
   @IsString()
   ACCESS_TOKEN_SECRET: string;
