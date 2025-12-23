@@ -13,4 +13,11 @@ export class SupplierController {
     const items = await this.supplierService.findAll();
     return ApiResponse.success(items);
   }
+
+    @Get(':id')
+  async detail(@Param('id') id: string) {
+    const item = await this.supplierService.findOne(id);
+    return ApiResponse.success(item);
+  }
+
 }
