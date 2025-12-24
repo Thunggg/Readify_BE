@@ -41,6 +41,9 @@ export class Account {
   @Prop({ default: 1 })
   status: number; // 1: active, 0: inactive, -1: banned, 2: not active email
 
+  @Prop({ default: false })
+  isDeleted: boolean;
+
   @Prop({ default: 0 })
   role: number; // 0: user, 1: admin, 2: seller, 3: warehouse manager
 

@@ -1,10 +1,18 @@
 import { Injectable, BadRequestException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+
+import * as bcrypt from 'bcryptjs';
+
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
+
 import { SearchStaffDto } from './dto/search-staff.dto';
+import { CreateStaffDto } from './dto/create-staff.dto';
+import { UpdateStaffDto } from './dto/update-staff.dto';
+
 import { ApiResponse } from '../../shared/responses/api-response';
-import { ErrorResponse } from 'src/shared/responses/error.response';
+import { ErrorResponse } from '../../shared/responses/error.response';
 
 @Injectable()
 export class StaffService {
@@ -12,6 +20,10 @@ export class StaffService {
     @InjectModel(Account.name)
     private readonly accountModel: Model<AccountDocument>,
   ) {}
+
+  private STAFF_ROLES(): number[] {
+    return [SearchStaffDto.AccountRole.ADMIN, SearchStaffDto.AccountRole.SELLER, SearchStaffDto.AccountRole.WAREHOUSE];
+  }
 
   async getStaffList(query: SearchStaffDto) {
     const {
@@ -170,5 +182,60 @@ export class StaffService {
     }
 
     return ApiResponse.success(staff, 'Lấy chi tiết nhân viên thành công');
+  }
+
+  async addStaff(dto: CreateStaffDto) {
+    const STAFF_ROLES = this.STAFF_ROLES();
+
+    if (!STAFF_ROLES.includes(dto.role)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'role', message: 'Role is not a staff role' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const email = dto.email.trim().toLowerCase();
+
+    const isEmailExists = await this.accountModel.exists({ email });
+    if (isEmailExists) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'email', message: 'Email already exists' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Hash password 
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const created = await this.accountModel.create({
+      firstName: dto.firstName?.trim(),
+      lastName: dto.lastName?.trim(),
+      dateOfBirth: dto.dateOfBirth,
+      phone: dto.phone,
+      avatarUrl: dto.avatarUrl,
+      address: dto.address,
+      email,
+      password: passwordHash,
+      role: dto.role,
+      status: dto.status ?? SearchStaffDto.AccountStatus.ACTIVE,
+      sex: dto.sex ?? 0,
+      lastLoginAt: undefined,
+    });
+
+    const data = {
+      _id: created._id,
+      firstName: created.firstName,
+      lastName: created.lastName,
+      email: created.email,
+      phone: created.phone,
+      address: created.address,
+      role: created.role,
+      status: created.status,
+      sex: created.sex,
+      createdAt: (created as any).createdAt,
+      updatedAt: (created as any).updatedAt,
+    };
+
+    return ApiResponse.success(data, 'Tạo nhân viên thành công');
   }
 }
