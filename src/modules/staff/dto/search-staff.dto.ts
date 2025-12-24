@@ -1,69 +1,34 @@
-import {
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { AccountStatus, AccountRole, StaffSortBy, SortOrder } from '../constants/staff.enum';
+import type { AccountStatusValue, AccountRoleValue, StaffSortByValue, SortOrderValue } from '../constants/staff.enum';
 
 export class SearchStaffDto {
-  // ===== ENUMS (INLINE) =====
-  static AccountRole = {
-    USER: 0,
-    ADMIN: 1,
-    SELLER: 2,
-    WAREHOUSE: 3,
-  } as const;
-
-  static AccountStatus = {
-    INACTIVE: 0,
-    ACTIVE: 1,
-    BANNED: -1,
-    NOT_ACTIVE_EMAIL: 2,
-  } as const;
-
-  static StaffSortBy = {
-    CREATED_AT: 'createdAt',
-    EMAIL: 'email',
-    FIRST_NAME: 'firstName',
-    LAST_NAME: 'lastName',
-    LAST_LOGIN_AT: 'lastLoginAt',
-  } as const;
-
-  static SortOrder = {
-    ASC: 'asc',
-    DESC: 'desc',
-  } as const;
-
   // ===== SEARCH =====
   @IsOptional()
   @IsString()
-  q?: string; // firstName / lastName / email / phone
+  q?: string;
 
   // ===== FILTER =====
   @IsOptional()
   @Type(() => Number)
-  @IsEnum(SearchStaffDto.AccountStatus)
-  status?: (typeof SearchStaffDto.AccountStatus)[keyof typeof SearchStaffDto.AccountStatus];
+  @IsEnum(AccountStatus)
+  status?: AccountStatusValue;
 
   @IsOptional()
   @Type(() => Number)
-  @IsEnum(SearchStaffDto.AccountRole)
-  role?: (typeof SearchStaffDto.AccountRole)[keyof typeof SearchStaffDto.AccountRole];
-  // chỉ dùng 1 | 2 | 3 ở service
+  @IsEnum(AccountRole)
+  role?: AccountRoleValue;
+  // service sẽ chặn role = 0
 
   // ===== SORT =====
   @IsOptional()
-  @IsEnum(SearchStaffDto.StaffSortBy)
-  sortBy: (typeof SearchStaffDto.StaffSortBy)[keyof typeof SearchStaffDto.StaffSortBy] =
-    SearchStaffDto.StaffSortBy.CREATED_AT;
+  @IsEnum(StaffSortBy)
+  sortBy: StaffSortByValue = StaffSortBy.CREATED_AT;
 
   @IsOptional()
-  @IsEnum(SearchStaffDto.SortOrder)
-  order: (typeof SearchStaffDto.SortOrder)[keyof typeof SearchStaffDto.SortOrder] =
-    SearchStaffDto.SortOrder.DESC;
+  @IsEnum(SortOrder)
+  order: SortOrderValue = SortOrder.DESC;
 
   // ===== PAGINATION =====
   @IsOptional()
@@ -78,4 +43,9 @@ export class SearchStaffDto {
   @Min(1)
   @Max(50)
   limit: number = 10;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isDeleted?: boolean;
 }

@@ -5,33 +5,40 @@ import { Model, Types } from 'mongoose';
 
 import * as bcrypt from 'bcryptjs';
 
+import { AccountRole, AccountStatus, StaffSortBy, SortOrder } from './constants/staff.enum';
+
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 
 import { SearchStaffDto } from './dto/search-staff.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
+import { UpdateStaffStatusDto } from './dto/update-staff-status.dto';
+import { UpdateStaffRoleDto } from './dto/update-staff-role.dto';
 
 import { ApiResponse } from '../../shared/responses/api-response';
 import { ErrorResponse } from '../../shared/responses/error.response';
 
 @Injectable()
 export class StaffService {
+  private readonly STAFF_ROLES: number[] = [
+    AccountRole.ADMIN,
+    AccountRole.SELLER,
+    AccountRole.WAREHOUSE,
+  ];
+
   constructor(
     @InjectModel(Account.name)
     private readonly accountModel: Model<AccountDocument>,
   ) {}
-
-  private STAFF_ROLES(): number[] {
-    return [SearchStaffDto.AccountRole.ADMIN, SearchStaffDto.AccountRole.SELLER, SearchStaffDto.AccountRole.WAREHOUSE];
-  }
 
   async getStaffList(query: SearchStaffDto) {
     const {
       q,
       status,
       role,
-      sortBy = SearchStaffDto.StaffSortBy.CREATED_AT,
-      order = SearchStaffDto.SortOrder.DESC,
+      isDeleted,
+      sortBy = StaffSortBy.CREATED_AT,
+      order = SortOrder.DESC,
       page = 1,
       limit = 10,
     } = query;
@@ -41,25 +48,20 @@ export class StaffService {
     const validLimit = Math.min(50, Math.max(1, limit));
     const skip = (validPage - 1) * validLimit;
 
-    // STAFF ROLES
-    const STAFF_ROLES: number[] = [
-      SearchStaffDto.AccountRole.ADMIN,
-      SearchStaffDto.AccountRole.SELLER,
-      SearchStaffDto.AccountRole.WAREHOUSE,
-    ];
-
     // FILTER
     const filter: any = {
-      role: { $in: STAFF_ROLES },
-      status: { $ne: SearchStaffDto.AccountStatus.BANNED },
+      role: { $in: this.STAFF_ROLES },
+      status: { $ne: AccountStatus.BANNED },
     };
+    if (isDeleted === true) filter.isDeleted = true;
+    else filter.isDeleted = { $ne: true };
 
     if (status !== undefined) {
       filter.status = status;
     }
 
     if (role !== undefined) {
-      if (!STAFF_ROLES.includes(role)) {
+      if (!this.STAFF_ROLES.includes(role)) {
         throw new BadRequestException('Invalid staff role');
       }
       filter.role = role;
@@ -148,17 +150,11 @@ export class StaffService {
       throw new BadRequestException('Invalid staff id');
     }
 
-    const STAFF_ROLES: number[] = [
-      SearchStaffDto.AccountRole.ADMIN,
-      SearchStaffDto.AccountRole.SELLER,
-      SearchStaffDto.AccountRole.WAREHOUSE,
-    ];
-
     const staff = await this.accountModel
       .findOne({
         _id: id,
-        role: { $in: STAFF_ROLES },
-        status: { $ne: SearchStaffDto.AccountStatus.BANNED },
+        role: { $in: this.STAFF_ROLES },
+        status: { $ne: AccountStatus.BANNED },
       })
       .select({
         firstName: 1,
@@ -185,9 +181,7 @@ export class StaffService {
   }
 
   async addStaff(dto: CreateStaffDto) {
-    const STAFF_ROLES = this.STAFF_ROLES();
-
-    if (!STAFF_ROLES.includes(dto.role)) {
+    if (!this.STAFF_ROLES.includes(dto.role)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'role', message: 'Role is not a staff role' }]),
         HttpStatus.BAD_REQUEST,
@@ -204,7 +198,7 @@ export class StaffService {
       );
     }
 
-    // Hash password 
+    // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const created = await this.accountModel.create({
@@ -217,7 +211,7 @@ export class StaffService {
       email,
       password: passwordHash,
       role: dto.role,
-      status: dto.status ?? SearchStaffDto.AccountStatus.ACTIVE,
+      status: dto.status ?? AccountStatus.ACTIVE,
       sex: dto.sex ?? 0,
       lastLoginAt: undefined,
     });
@@ -239,7 +233,7 @@ export class StaffService {
     return ApiResponse.success(data, 'Tạo nhân viên thành công');
   }
 
-    // Edit Staff
+  // Edit Staff
   async editStaff(id: string, dto: UpdateStaffDto) {
     if (!Types.ObjectId.isValid(id)) {
       throw new HttpException(
@@ -248,14 +242,12 @@ export class StaffService {
       );
     }
 
-    const STAFF_ROLES = this.STAFF_ROLES();
-
     const staff = await this.accountModel.findById(id);
     if (!staff) {
       throw new HttpException(ErrorResponse.notFound('Staff not found'), HttpStatus.NOT_FOUND);
     }
 
-    if (!STAFF_ROLES.includes(staff.role)) {
+    if (!this.STAFF_ROLES.includes(staff.role)) {
       throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
     }
 
@@ -264,7 +256,7 @@ export class StaffService {
     // }
 
     // role update validation
-    if (dto.role !== undefined && !STAFF_ROLES.includes(dto.role)) {
+    if (dto.role !== undefined && !this.STAFF_ROLES.includes(dto.role)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'role', message: 'Role is not a staff role' }]),
         HttpStatus.BAD_REQUEST,
@@ -317,5 +309,37 @@ export class StaffService {
     };
 
     return ApiResponse.success(data, 'Cập nhật nhân viên thành công');
+  }
+
+  // Delete Staff (soft delete)
+  async deleteStaff(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid staff id' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const staff = await this.accountModel.findById(id);
+    if (!staff) {
+      throw new HttpException(ErrorResponse.notFound('Staff not found'), HttpStatus.NOT_FOUND);
+    }
+
+    if (!this.STAFF_ROLES.includes(staff.role)) {
+      throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
+    }
+
+    if (staff.isDeleted === true) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Staff already deleted' }]),
+        HttpStatus.BAD_REQUEST, 
+      );
+    }
+
+    // Soft delete
+    staff.isDeleted = true;
+    await staff.save();
+
+    return ApiResponse.success({ _id: id }, 'Xoá nhân viên thành công');
   }
 }

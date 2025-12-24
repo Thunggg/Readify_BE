@@ -3,6 +3,8 @@ import { StaffService } from './staff.service';
 import { SearchStaffDto } from './dto/search-staff.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
+import { UpdateStaffStatusDto } from './dto/update-staff-status.dto';
+import { UpdateStaffRoleDto } from './dto/update-staff-role.dto';
 import { StaffIdDto } from './dto/staff-id.dto';
 
 @Controller('staff')
@@ -27,5 +29,10 @@ export class StaffController {
   @Patch(':id')
   editStaff(@Param() params: StaffIdDto, @Body() dto: UpdateStaffDto) {
     return this.staffService.editStaff(params.id, dto);
+  }
+
+  @Delete(':id')
+  deleteStaff(@Param() params: StaffIdDto) {
+    return this.staffService.deleteStaff(params.id);
   }
 }
