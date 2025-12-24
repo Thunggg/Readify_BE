@@ -104,7 +104,7 @@ export class StockService implements OnModuleInit, OnModuleDestroy {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      
+
       // Convert to JSON with header mapping
       // Expected columns: ISBN, Quantity, Location, Price, Batch, Status
       const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
@@ -143,9 +143,9 @@ export class StockService implements OnModuleInit, OnModuleDestroy {
 
           const validationErrors = await validate(stockDto);
           if (validationErrors.length > 0) {
-            const errorMessages = validationErrors.map(err => 
-              Object.values(err.constraints || {}).join(', ')
-            ).join('; ');
+            const errorMessages = validationErrors
+              .map((err) => Object.values(err.constraints || {}).join(', '))
+              .join('; ');
             result.failed++;
             result.errors.push({
               row: rowNum,
@@ -219,5 +219,44 @@ export class StockService implements OnModuleInit, OnModuleDestroy {
     }
 
     return result;
+  }
+  async exportStockToExcel(): Promise<Buffer> {
+    // Fetch all stocks with book information
+    const stocks = await this.findAll();
+
+    // Prepare data for Excel
+    const excelData = stocks.map((stock) => ({
+      ISBN: stock.book?.isbn || '',
+      'Book Title': stock.book?.title || '',
+      Author: stock.book?.author || '',
+      Quantity: stock.quantity || 0,
+      Location: stock.location || '',
+      Price: stock.price || 0,
+      Batch: stock.batch || '',
+      Status: stock.status || '',
+      'Last Updated': stock.lastUpdated || '',
+    }));
+
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Data');
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 20 }, // ISBN
+      { wch: 30 }, // Book Title
+      { wch: 20 }, // Author
+      { wch: 10 }, // Quantity
+      { wch: 12 }, // Location
+      { wch: 12 }, // Price
+      { wch: 12 }, // Batch
+      { wch: 12 }, // Status
+      { wch: 20 }, // Last Updated
+    ];
+
+    // Generate buffer
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return buffer as Buffer;
   }
 }
