@@ -1,5 +1,9 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, NotFoundException } from '@nestjs/common';
 import { MongoClient, Collection, ObjectId } from 'mongodb';
+import * as XLSX from 'xlsx';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ImportStockRowDto, ImportStockResultDto } from './dto/import-stock.dto';
 
 @Injectable()
 export class StockService implements OnModuleInit, OnModuleDestroy {
@@ -85,5 +89,135 @@ export class StockService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       return { stock: doc };
     }
+  }
+
+  async importStockFromExcel(buffer: Buffer): Promise<ImportStockResultDto> {
+    const result: ImportStockResultDto = {
+      success: true,
+      imported: 0,
+      failed: 0,
+      errors: [],
+    };
+
+    try {
+      // Parse Excel file
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convert to JSON with header mapping
+      // Expected columns: ISBN, Quantity, Location, Price, Batch, Status
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      if (rows.length === 0) {
+        result.success = false;
+        result.errors.push({ row: 0, message: 'File Excel trống hoặc không có dữ liệu' });
+        return result;
+      }
+
+      const booksColl = this.client.db().collection('books');
+
+      // Process each row
+      for (let i = 0; i < rows.length; i++) {
+        const rowNum = i + 2; // Excel row number (header is row 1)
+        const row = rows[i];
+
+        try {
+          // Map Excel columns to DTO (flexible column names)
+          const isbn = row['ISBN'] || row['isbn'] || row['Isbn'] || '';
+          const quantity = parseFloat(row['Quantity'] || row['quantity'] || row['SoLuong'] || row['So Luong'] || 0);
+          const location = row['Location'] || row['location'] || row['ViTri'] || row['Vi Tri'] || '';
+          const price = parseFloat(row['Price'] || row['price'] || row['Gia'] || row['Giá'] || 0);
+          const batch = row['Batch'] || row['batch'] || row['Lo'] || row['Lô'] || '';
+          const status = row['Status'] || row['status'] || row['TrangThai'] || row['Trang Thai'] || 'available';
+
+          // Validate data using DTO
+          const stockDto = plainToInstance(ImportStockRowDto, {
+            isbn,
+            quantity,
+            location,
+            price,
+            batch,
+            status,
+          });
+
+          const validationErrors = await validate(stockDto);
+          if (validationErrors.length > 0) {
+            const errorMessages = validationErrors.map(err => 
+              Object.values(err.constraints || {}).join(', ')
+            ).join('; ');
+            result.failed++;
+            result.errors.push({
+              row: rowNum,
+              isbn,
+              message: `Validation failed: ${errorMessages}`,
+            });
+            continue;
+          }
+
+          // Find book by ISBN
+          const book = await booksColl.findOne({ isbn });
+          if (!book) {
+            result.failed++;
+            result.errors.push({
+              row: rowNum,
+              isbn,
+              message: `Không tìm thấy sách với ISBN: ${isbn}`,
+            });
+            continue;
+          }
+
+          // Check if stock already exists for this book
+          const existingStock = await this.collection.findOne({ bookId: book._id });
+
+          if (existingStock) {
+            // Update existing stock
+            await this.collection.updateOne(
+              { _id: existingStock._id },
+              {
+                $set: {
+                  quantity: existingStock.quantity + quantity,
+                  location: location || existingStock.location,
+                  price: price || existingStock.price,
+                  batch: batch || existingStock.batch,
+                  status: status || existingStock.status,
+                  lastUpdated: new Date().toISOString(),
+                },
+              },
+            );
+          } else {
+            // Create new stock entry
+            await this.collection.insertOne({
+              bookId: book._id,
+              quantity,
+              location,
+              price,
+              batch,
+              status,
+              lastUpdated: new Date().toISOString(),
+            });
+          }
+
+          result.imported++;
+        } catch (error) {
+          result.failed++;
+          result.errors.push({
+            row: rowNum,
+            isbn: row['ISBN'] || row['isbn'] || '',
+            message: `Error: ${error.message}`,
+          });
+        }
+      }
+
+      result.success = result.imported > 0;
+    } catch (error) {
+      result.success = false;
+      result.errors.push({
+        row: 0,
+        message: `Failed to process Excel file: ${error.message}`,
+      });
+    }
+
+    return result;
   }
 }
