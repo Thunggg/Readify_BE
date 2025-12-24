@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 import { SearchStaffDto } from './dto/search-staff.dto';
 import { ApiResponse } from '../../shared/responses/api-response';
+import { ErrorResponse } from 'src/shared/responses/error.response';
 
 @Injectable()
 export class StaffService {
@@ -23,7 +24,7 @@ export class StaffService {
       limit = 10,
     } = query;
 
-    // PAGINATION 
+    // PAGINATION
     const validPage = Math.max(1, page);
     const validLimit = Math.min(50, Math.max(1, limit));
     const skip = (validPage - 1) * validLimit;
@@ -54,7 +55,7 @@ export class StaffService {
 
     if (q?.trim()) {
       // split by spaces, remove empty
-      const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 5); 
+      const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
 
       // escape regex special chars
       const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -89,7 +90,7 @@ export class StaffService {
 
     const sort = {
       ...(sortMap[sortBy] ?? { createdAt: -1 }),
-      _id: 1, 
+      _id: 1,
     };
 
     // QUERY
@@ -119,8 +120,6 @@ export class StaffService {
       this.accountModel.countDocuments(filter),
     ]);
 
-    console.log('item', items);
-
     return ApiResponse.paginated(
       items,
       {
@@ -130,5 +129,46 @@ export class StaffService {
       },
       'Lấy danh sách nhân viên thành công',
     );
+  }
+
+  async getStaffDetail(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid staff id');
+    }
+
+    const STAFF_ROLES: number[] = [
+      SearchStaffDto.AccountRole.ADMIN,
+      SearchStaffDto.AccountRole.SELLER,
+      SearchStaffDto.AccountRole.WAREHOUSE,
+    ];
+
+    const staff = await this.accountModel
+      .findOne({
+        _id: id,
+        role: { $in: STAFF_ROLES },
+        status: { $ne: SearchStaffDto.AccountStatus.BANNED },
+      })
+      .select({
+        firstName: 1,
+        lastName: 1,
+        dateOfBirth: 1,
+        phone: 1,
+        avatarUrl: 1,
+        address: 1,
+        email: 1,
+        status: 1,
+        role: 1,
+        sex: 1,
+        lastLoginAt: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .lean();
+
+    if (!staff) {
+      throw new HttpException(ErrorResponse.notFound('Staff not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(staff, 'Lấy chi tiết nhân viên thành công');
   }
 }
