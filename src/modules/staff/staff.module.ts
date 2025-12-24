@@ -2,12 +2,11 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { StaffController } from './staff.controller';
 import { StaffService } from './staff.service';
-import { StaffRepository } from './staff.repository';
-import { Staff, StaffSchema } from './schemas/staff.schema';
+import { Account, AccountSchema } from '../accounts/schemas/account.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Staff.name, schema: StaffSchema }])],
+  imports: [MongooseModule.forFeature([{ name: Account.name, schema: AccountSchema }])],
   controllers: [StaffController],
-  providers: [StaffService, StaffRepository],
+  providers: [StaffService],
 })
 export class StaffModule {}

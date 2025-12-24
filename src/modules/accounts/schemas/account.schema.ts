@@ -19,6 +19,9 @@ export class Account {
   phone: string;
 
   @Prop()
+  avatarUrl?: string;
+
+  @Prop()
   address: string;
 
   // ========== AUTH INFO ==========
@@ -30,6 +33,9 @@ export class Account {
 
   @Prop({ trim: true })
   googleId?: string;
+
+  @Prop()
+  lastLoginAt?: Date;
 
   // ========== STATUS ==========
   @Prop({ default: 1 })

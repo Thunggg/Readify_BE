@@ -1,21 +1,132 @@
-import { Injectable } from '@nestjs/common';
-import { StaffRepository } from './staff.repository';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 import { SearchStaffDto } from './dto/search-staff.dto';
 import { ApiResponse } from '../../shared/responses/api-response';
 
 @Injectable()
 export class StaffService {
-  constructor(private readonly repo: StaffRepository) {}
+  constructor(
+    @InjectModel(Account.name)
+    private readonly accountModel: Model<AccountDocument>,
+  ) {}
 
   async getStaffList(query: SearchStaffDto) {
-    const result = await this.repo.findMany(query);
-    
+    const {
+      q,
+      status,
+      role,
+      sortBy = SearchStaffDto.StaffSortBy.CREATED_AT,
+      order = SearchStaffDto.SortOrder.DESC,
+      page = 1,
+      limit = 10,
+    } = query;
+
+    // PAGINATION 
+    const validPage = Math.max(1, page);
+    const validLimit = Math.min(50, Math.max(1, limit));
+    const skip = (validPage - 1) * validLimit;
+
+    // STAFF ROLES
+    const STAFF_ROLES: number[] = [
+      SearchStaffDto.AccountRole.ADMIN,
+      SearchStaffDto.AccountRole.SELLER,
+      SearchStaffDto.AccountRole.WAREHOUSE,
+    ];
+
+    // FILTER
+    const filter: any = {
+      role: { $in: STAFF_ROLES },
+      status: { $ne: SearchStaffDto.AccountStatus.BANNED },
+    };
+
+    if (status !== undefined) {
+      filter.status = status;
+    }
+
+    if (role !== undefined) {
+      if (!STAFF_ROLES.includes(role)) {
+        throw new BadRequestException('Invalid staff role');
+      }
+      filter.role = role;
+    }
+
+    if (q?.trim()) {
+      // split by spaces, remove empty
+      const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 5); 
+
+      // escape regex special chars
+      const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      filter.$and = tokens.map((t) => {
+        const kw = escapeRegex(t);
+        return {
+          $or: [
+            { firstName: { $regex: kw, $options: 'i' } },
+            { lastName: { $regex: kw, $options: 'i' } },
+            { email: { $regex: kw, $options: 'i' } },
+            { phone: { $regex: kw, $options: 'i' } },
+          ],
+        };
+      });
+    }
+
+    // SORT
+    const sortMap: Record<string, any> = {
+      createdAt: { createdAt: order === 'asc' ? 1 : -1 },
+      email: { email: order === 'asc' ? 1 : -1 },
+      firstName: {
+        firstName: order === 'asc' ? 1 : -1,
+        lastName: order === 'asc' ? 1 : -1,
+      },
+      lastName: {
+        lastName: order === 'asc' ? 1 : -1,
+        firstName: order === 'asc' ? 1 : -1,
+      },
+      lastLoginAt: { lastLoginAt: order === 'asc' ? 1 : -1 },
+    };
+
+    const sort = {
+      ...(sortMap[sortBy] ?? { createdAt: -1 }),
+      _id: 1, 
+    };
+
+    // QUERY
+    const [items, total] = await Promise.all([
+      this.accountModel
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(validLimit)
+        .select({
+          firstName: 1,
+          lastName: 1,
+          email: 1,
+          phone: 1,
+          avatarUrl: 1,
+          address: 1,
+          dateOfBirth: 1,
+          sex: 1,
+          status: 1,
+          role: 1,
+          lastLoginAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .lean(),
+
+      this.accountModel.countDocuments(filter),
+    ]);
+
+    console.log('item', items);
+
     return ApiResponse.paginated(
-      result.items,
+      items,
       {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
+        page: validPage,
+        limit: validLimit,
+        total,
       },
       'Lấy danh sách nhân viên thành công',
     );
