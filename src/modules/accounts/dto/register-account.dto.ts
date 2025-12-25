@@ -13,4 +13,10 @@ export class RegisterAccountDto {
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @MaxLength(255, { message: 'Password must be less than 255 characters long' })
   password: string;
+
+  @IsString({ message: 'Confirm password must be a string' })
+  @IsNotEmpty({ message: 'Confirm password can not be empty' })
+  @MinLength(8, { message: 'Confirm password must be at least 8 characters long' })
+  @MaxLength(255, { message: 'Confirm password must be less than 255 characters long' })
+  confirmPassword: string;
 }
