@@ -1,7 +1,8 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import type { Response } from 'express';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -25,9 +26,13 @@ export class AuthController {
     return response;
   }
 
-  // POST /auth/verify-email
-  //   @Post('verify-email')
-  //   verifyEmail(@Body() dto: VerifyEmailDto) {
-  //     return this.authService.verifyEmail(dto);
-  //   }
+  // POST /auth/logout
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const response = await this.authService.logout(req?.cookies?.accessToken as string);
+    res.clearCookie('accessToken');
+    return response;
+  }
 }

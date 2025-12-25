@@ -67,4 +67,18 @@ export class AuthService {
 
     return ApiResponse.success({ accessToken }, 'Login successful', 200);
   }
+
+  async logout(token: string) {
+    if (!token) {
+      throw new HttpException(ApiResponse.error('Unauthorized', 'UNAUTHORIZED', 401), 401);
+    }
+
+    const userId = this.jwtUtil.verifyAccessToken(
+      token,
+      this.configService.get<string>('jwt.accessTokenSecret') as string,
+    ).sub;
+
+    await this.refreshTokenModel.deleteOne({ userId });
+    return ApiResponse.success('Logged out successfully', 'LOGOUT_SUCCESS', 200);
+  }
 }

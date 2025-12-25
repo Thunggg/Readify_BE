@@ -34,10 +34,10 @@ export class JwtUtil {
     return this.jwt.sign(payload, options) as string;
   }
 
-  //   verifyToken<T>(token: string, secret: string): T {
-  //     const options: JwtVerifyOptions = {
-  //       secret,
-  //     };
-  //     return this.jwt.verify<T>(token, options) as unknown as T;
-  //   }
+  verifyAccessToken(token: string, secret: string) {
+    const options: JwtVerifyOptions = {
+      secret,
+    };
+    return this.jwt.verify(token, options) as unknown as AccessTokenPayload;
+  }
 }

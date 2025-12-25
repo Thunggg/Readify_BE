@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       // Cookie-only auth: access token is stored in cookie "accessToken"
       jwtFromRequest: ExtractJwt.fromExtractors([cookieTokenExtractor]),
-      ignoreExpiration: true,
+      ignoreExpiration: false,
       secretOrKey: configService.get<string>('jwt.accessTokenSecret') as string,
     });
   }

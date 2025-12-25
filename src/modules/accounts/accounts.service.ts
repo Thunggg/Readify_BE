@@ -23,7 +23,7 @@ export class AccountsService {
     const isEmailExists = await this.accountModel.findOne({ email });
 
     if (isEmailExists) {
-      throw new HttpException(ErrorResponse.validationError([{ message: 'Email already exists' }]), 400);
+      throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
     }
 
     if (dto.password !== dto.confirmPassword) {
