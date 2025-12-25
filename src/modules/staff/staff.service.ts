@@ -20,11 +20,7 @@ import { ErrorResponse } from '../../shared/responses/error.response';
 
 @Injectable()
 export class StaffService {
-  private readonly STAFF_ROLES: number[] = [
-    AccountRole.ADMIN,
-    AccountRole.SELLER,
-    AccountRole.WAREHOUSE,
-  ];
+  private readonly STAFF_ROLES: number[] = [AccountRole.ADMIN, AccountRole.SELLER, AccountRole.WAREHOUSE];
 
   constructor(
     @InjectModel(Account.name)
@@ -332,7 +328,7 @@ export class StaffService {
     if (staff.isDeleted === true) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'id', message: 'Staff already deleted' }]),
-        HttpStatus.BAD_REQUEST, 
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -341,5 +337,35 @@ export class StaffService {
     await staff.save();
 
     return ApiResponse.success({ _id: id }, 'Xoá nhân viên thành công');
+  }
+
+  async restoreStaff(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid staff id' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const staff = await this.accountModel.findById(id);
+    if (!staff) {
+      throw new HttpException(ErrorResponse.notFound('Staff not found'), HttpStatus.NOT_FOUND);
+    }
+
+    if (!this.STAFF_ROLES.includes(staff.role)) {
+      throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
+    }
+
+    if (staff.isDeleted !== true) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Staff is not deleted' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    staff.isDeleted = false;
+    await staff.save();
+
+    return ApiResponse.success({ _id: id }, 'Khôi phục nhân viên thành công');
   }
 }

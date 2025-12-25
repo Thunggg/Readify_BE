@@ -35,4 +35,9 @@ export class StaffController {
   deleteStaff(@Param() params: StaffIdDto) {
     return this.staffService.deleteStaff(params.id);
   }
+
+  @Patch(':id/restore')
+  restoreStaff(@Param() params: StaffIdDto) {
+    return this.staffService.restoreStaff(params.id);
+  }
 }
