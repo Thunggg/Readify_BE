@@ -8,6 +8,7 @@ import { DatabaseModule } from './shared/database/database.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SupplierModule } from './modules/supplier/supplier.module';
     AccountsModule,
     StockModule,
     SupplierModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ErrorResponse } from 'src/shared/responses/error.response';
+import { hashPassword } from 'src/shared/utils/bcrypt';
 
 @Injectable()
 export class AccountsService {
@@ -25,7 +26,17 @@ export class AccountsService {
       throw new HttpException(ErrorResponse.validationError([{ message: 'Email already exists' }]), 400);
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, this.configService.get<number>('bcrypt.saltRounds') as number);
+    if (dto.password !== dto.confirmPassword) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ message: 'Password and confirm password do not match' }]),
+        400,
+      );
+    }
+
+    const passwordHash = await hashPassword(
+      dto.password,
+      this.configService.get<number>('bcrypt.saltRounds') as number,
+    );
 
     const newAccount = new this.accountModel({
       email,
@@ -39,5 +50,15 @@ export class AccountsService {
     const account = savedAccount.toObject();
 
     return ApiResponse.success(account, 'Account created successfully', 200);
+  }
+
+  async me(userId: string) {
+    const account = await this.accountModel.findById(userId);
+
+    if (!account) {
+      throw new HttpException(ApiResponse.error('Account not found', 'ACCOUNT_NOT_FOUND', 404), 404);
+    }
+
+    return ApiResponse.success(account, 'Account fetched successfully', 200);
   }
 }
