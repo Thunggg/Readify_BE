@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Delete } from '@nestj
 import { BooksAdminService } from '../services/books.admin.service';
 import { SearchAdminBooksDto } from '../dto/search-admin-books.dto';
 import { BookIdDto } from '../dto/book-id.dto';
+import { BookSlugDto } from '../dto/book-slug.dto';
 import { CreateBookDto } from '../dto/create-book.dto';
 import { UpdateBookDto } from '../dto/update-book.dto';
 
@@ -12,6 +13,11 @@ export class BooksAdminController {
   @Get()
   getAdminBookList(@Query() query: SearchAdminBooksDto) {
     return this.booksAdminService.getAdminBookList(query);
+  }
+
+  @Get(':slug')
+  getBookBySlug(@Param() params: BookSlugDto) {
+    return this.booksAdminService.getBookBySlug(params.slug);
   }
 
   @Get(':id')

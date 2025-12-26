@@ -131,6 +131,51 @@ export class BooksAdminService {
     );
   }
 
+  async getBookBySlug(slug: string) {
+    if (!slug?.trim()) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'slug', message: 'Slug is required' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const book = await this.bookModel
+      .findOne({ slug: slug.toLowerCase().trim(), isDeleted: false })
+      .select({
+        title: 1,
+        slug: 1,
+        subtitle: 1,
+        description: 1,
+        authors: 1,
+        language: 1,
+        format: 1,
+        publishDate: 1,
+        pageCount: 1,
+        isbn: 1,
+        publisherId: 1,
+        categoryIds: 1,
+        basePrice: 1,
+        originalPrice: 1,
+        currency: 1,
+        images: 1,
+        thumbnailUrl: 1,
+        status: 1,
+        soldCount: 1,
+        tags: 1,
+        stockOnHand: 1,
+        stockReserved: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .lean();
+
+    if (!book) {
+      throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(book, 'Successfully retrieved the book by slug');
+  }
+
   // View book detail for dashboard
   async getAdminBookDetail(id: string) {
     if (!Types.ObjectId.isValid(id)) {
