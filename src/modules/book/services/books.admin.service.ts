@@ -582,4 +582,62 @@ export class BooksAdminService {
       session.endSession();
     }
   }
+
+  async deleteBook(id: string, staffId?: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const session = await this.connection.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        const book = await this.bookModel.findById(id).session(session);
+        if (!book) {
+          throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
+        }
+        // if (book.isDeleted) {
+        //   throw new HttpException(
+        //     ErrorResponse.validationError([{ field: 'id', message: 'Book already deleted' }]),
+        //     HttpStatus.BAD_REQUEST,
+        //   );
+        // }
+
+        //  Rule: không cho delete nếu còn hàng hoặc đang reserved
+        // if ((book.stockOnHand ?? 0) > 0 || (book.stockReserved ?? 0) > 0) {
+        //   throw new HttpException(
+        //     ErrorResponse.validationError([{ field: 'id', message: 'Cannot delete book with remaining stock' }]),
+        //     HttpStatus.BAD_REQUEST,
+        //   );
+        // }
+
+        // 2) Soft delete Book
+        book.isDeleted = true;
+        (book as any).deletedAt = new Date();
+        if (staffId && Types.ObjectId.isValid(staffId)) {
+          (book as any).deletedBy = new Types.ObjectId(staffId);
+        }
+        await book.save({ session });
+
+        await this.stockModel.updateMany(
+          { bookId: book._id },
+          {
+            $set: {
+              quantity: 0,
+              status: 'inactive',
+              lastUpdated: new Date(),
+            },
+          },
+          { session },
+        );
+      });
+
+      return ApiResponse.success(null, 'Book deleted successfully');
+    } finally {
+      session.endSession();
+    }
+  }
 }
