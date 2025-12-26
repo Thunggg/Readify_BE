@@ -6,6 +6,7 @@ import { SearchPublicBooksDto } from '../dto/search-public-books.dto';
 import { ApiResponse } from '../../../shared/responses/api-response';
 import { ErrorResponse } from '../../../shared/responses/error.response';
 import { SortOrder } from 'mongoose';
+import { SearchBookSuggestionsDto } from '../dto/search-book-suggestions.dto';
 
 @Injectable()
 export class BooksPublicService {
@@ -104,5 +105,38 @@ export class BooksPublicService {
       },
       'Get books list successfully',
     );
+  }
+
+  async getBookSuggestions(query: SearchBookSuggestionsDto) {
+    const keyword = query.q?.trim();
+    const limit = Math.min(query.limit ?? 6, 10);
+
+    // Không search khi keyword quá ngắn
+    if (!keyword || keyword.length < 2) {
+      return ApiResponse.success({ items: [] });
+    }
+
+    const items = await this.bookModel
+      .find({
+        isDeleted: false,
+        status: 1,
+        $or: [
+          { title: { $regex: keyword, $options: 'i' } },
+          { slug: { $regex: keyword, $options: 'i' } },
+          { authors: { $elemMatch: { $regex: keyword, $options: 'i' } } },
+        ],
+      })
+      .select({
+        title: 1,
+        slug: 1,
+        thumbnailUrl: 1,
+        basePrice: 1,
+        authors: 1,
+      })
+      .sort({ soldCount: -1 })
+      .limit(limit)
+      .lean();
+
+    return ApiResponse.success({ items });
   }
 }
