@@ -15,7 +15,7 @@ export class BooksAdminController {
     return this.booksAdminService.getAdminBookList(query);
   }
 
-  @Get(':slug')
+  @Get('slug/:slug')
   getBookBySlug(@Param() params: BookSlugDto) {
     return this.booksAdminService.getBookBySlug(params.slug);
   }
@@ -38,5 +38,10 @@ export class BooksAdminController {
   @Delete(':id')
   deleteBook(@Param() params: BookIdDto) {
     return this.booksAdminService.deleteBook(params.id);
+  }
+
+  @Patch(':id/restore')
+  restoreBook(@Param() params: BookIdDto) {
+    return this.booksAdminService.restoreBook(params.id);
   }
 }

@@ -685,4 +685,56 @@ export class BooksAdminService {
       session.endSession();
     }
   }
+
+  async restoreBook(id: string, staffId?: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const session = await this.connection.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        const book = await this.bookModel.findById(id).session(session);
+        if (!book) {
+          throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
+        }
+
+        if (!book.isDeleted) {
+          throw new HttpException(
+            ErrorResponse.validationError([{ field: 'id', message: 'Book is not deleted' }]),
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        // Restore Book
+        book.isDeleted = false;
+        (book as any).deletedAt = null;
+        if (staffId && Types.ObjectId.isValid(staffId)) {
+          (book as any).restoredBy = new Types.ObjectId(staffId);
+          (book as any).restoredAt = new Date();
+        }
+        await book.save({ session });
+
+        // Restore stock status (quantity remains 0, admin needs to update stock manually)
+        await this.stockModel.updateMany(
+          { bookId: book._id },
+          {
+            $set: {
+              status: 'available',
+              lastUpdated: new Date(),
+            },
+          },
+          { session },
+        );
+      });
+
+      return ApiResponse.success(null, 'Book restored successfully');
+    } finally {
+      session.endSession();
+    }
+  }
 }
