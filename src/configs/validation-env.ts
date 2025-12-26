@@ -9,4 +9,8 @@ export const validateEnv = Joi.object({
   PORT: Joi.number().required(),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').required(),
   BCRYPT_SALT_ROUNDS: Joi.number().required(),
+  
+  CLOUDINARY_CLOUD_NAME: Joi.string().required(),
+  CLOUDINARY_API_KEY: Joi.string().required(),
+  CLOUDINARY_API_SECRET: Joi.string().required(),
 });

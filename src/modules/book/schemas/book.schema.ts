@@ -26,9 +26,6 @@ export class Book {
   @Prop({ trim: true })
   language?: string;
 
-  @Prop({ trim: true })
-  format?: string; // hardcover/paperback/ebook...
-
   @Prop()
   publishDate?: Date;
 
@@ -58,14 +55,23 @@ export class Book {
   @Prop({ default: 'VND' })
   currency: string;
 
-  // ===== MEDIA =====
-  @Prop({ type: [String], default: [] })
-  images: string[];
+  // Media images
+  @Prop({
+    type: [
+      {
+        kind: { type: String, enum: ['cover', 'gallery'], required: true },
+        mediaId: { type: Types.ObjectId, ref: 'Media', required: true },
+        url: { type: String, required: true },
+      },
+    ],
+    default: [],
+  })
+  images: { kind: 'cover' | 'gallery'; mediaId: Types.ObjectId; url: string }[];
 
   @Prop({ trim: true })
   thumbnailUrl?: string;
 
-  // number (no enum): 1 active, 0 inactive, 2 hidden, 3 draft, 4 out_of_stock (you decide)
+  // number (no enum): 1 active, 0 inactive, 2 hidden, 3 draft, 4 out_of_stock
   @Prop({ default: 1, index: true })
   status: number;
 

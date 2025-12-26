@@ -11,6 +11,8 @@ import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
 import { BookModule } from './modules/book/books.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { MediaModule } from './modules/media/media.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -19,6 +21,7 @@ import { AuthModule } from './modules/auth/auth.module';
       load: [configuration],
       validationSchema: validateEnv,
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     AccountsModule,
     StaffModule,
@@ -26,6 +29,7 @@ import { AuthModule } from './modules/auth/auth.module';
     SupplierModule,
     BookModule,
     AuthModule,
+    MediaModule
   ],
   controllers: [AppController],
   providers: [AppService],
