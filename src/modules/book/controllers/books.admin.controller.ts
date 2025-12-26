@@ -11,4 +11,9 @@ export class BooksAdminController {
   getAdminBookList(@Query() query: SearchAdminBooksDto) {
     return this.booksAdminService.getAdminBookList(query);
   }
+
+  @Get(':id')
+  getAdminBookDetail(@Param() params: BookIdDto) {
+    return this.booksAdminService.getAdminBookDetail(params.id);
+  }
 }
