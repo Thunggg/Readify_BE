@@ -139,4 +139,95 @@ export class BooksPublicService {
 
     return ApiResponse.success({ items });
   }
+
+  async getBookDetailById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const book = await this.bookModel
+      .findOne({ _id: new Types.ObjectId(id), isDeleted: false, status: 1 })
+      .select({
+        title: 1,
+        slug: 1,
+        subtitle: 1,
+        description: 1,
+        authors: 1,
+        language: 1,
+        publishDate: 1,
+        pageCount: 1,
+        isbn: 1,
+        publisherId: 1,
+        categoryIds: 1,
+        images: 1,
+        thumbnailUrl: 1,
+        basePrice: 1,
+        originalPrice: 1,
+        currency: 1,
+        averageRating: 1,
+        totalReviews: 1,
+        soldCount: 1,
+        stockOnHand: 1,
+        createdAt: 1,
+      })
+      // populate
+      .populate('publisherId', 'name')
+      .populate('categoryIds', 'name slug')
+      .lean();
+
+    if (!book) {
+      throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(book, 'Get book detail successfully');
+  }
+
+  async getBookDetailBySlug(slug: string) {
+    const s = slug?.trim().toLowerCase();
+    if (!s) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'slug', message: 'Slug is required' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const book = await this.bookModel
+      .findOne({ slug: s, isDeleted: false, status: 1 })
+      .select({
+        title: 1,
+        slug: 1,
+        subtitle: 1,
+        description: 1,
+        authors: 1,
+        language: 1,
+        publishDate: 1,
+        pageCount: 1,
+        isbn: 1,
+        publisherId: 1,
+        categoryIds: 1,
+        images: 1,
+        thumbnailUrl: 1,
+        basePrice: 1,
+        originalPrice: 1,
+        currency: 1,
+        averageRating: 1,
+        totalReviews: 1,
+        soldCount: 1,
+        stockOnHand: 1,
+        createdAt: 1,
+      })
+      // populate
+      .populate('publisherId', 'name')
+      .populate('categoryIds', 'name slug')
+      .lean();
+
+    if (!book) {
+      throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(book, 'Get book detail successfully');
+  }
 }
