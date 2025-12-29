@@ -18,6 +18,7 @@ export class StaffController {
   constructor(private readonly staffService: StaffService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   getList(@Query() query: SearchStaffDto) {
     return this.staffService.getStaffList(query);
   }

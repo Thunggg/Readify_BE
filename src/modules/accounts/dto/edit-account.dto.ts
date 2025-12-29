@@ -1,32 +1,21 @@
-import {
-  IsDate,
-  IsEmail,
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-  Min,
-  MinLength,
-} from 'class-validator';
+import { IsDate, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AccountRole } from 'src/modules/staff/constants/staff.enum';
-import { Prop } from '@nestjs/mongoose';
 
-export class CreateAccountDto {
+export class UpdateAccountDto {
+  @IsOptional()
   @IsEmail({}, { message: 'Invalid email format' })
   @IsString({ message: 'Email must be a string' })
   @IsNotEmpty({ message: 'Email can not be empty' })
   @MinLength(5, { message: 'Email must be at least 5 characters long' })
   @MaxLength(255, { message: 'Email must be less than 255 characters long' })
-  email: string;
+  email?: string;
 
+  @IsOptional()
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password can not be empty' })
   @MinLength(6, { message: 'Password must be at least 6 characters long' })
   @MaxLength(255, { message: 'Password must be less than 255 characters long' })
-  password: string;
+  password?: string;
 
   @IsOptional()
   @IsString({ message: 'First name must be a string' })
@@ -57,12 +46,6 @@ export class CreateAccountDto {
   @IsString({ message: 'Address must be a string' })
   @MaxLength(255, { message: 'Address must be less than 255 characters long' })
   address?: string;
-
-  @IsEnum(AccountRole)
-  @Type(() => Number)
-  @IsInt({ message: 'Role must be a number' })
-  @Prop({ default: AccountRole.USER })
-  role: number;
 
   // 1: active, 0: inactive, 2: not active email
   @IsOptional()
