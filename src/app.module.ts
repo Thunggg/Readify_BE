@@ -10,6 +10,10 @@ import { StaffModule } from './modules/staff/staff.module';
 import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { BookModule } from './modules/book/book.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -24,6 +28,10 @@ import { AuthModule } from './modules/auth/auth.module';
     StockModule,
     SupplierModule,
     AuthModule,
+    NotificationsModule,
+    CategoriesModule,
+    BookModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
