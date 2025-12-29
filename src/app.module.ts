@@ -10,6 +10,7 @@ import { StaffModule } from './modules/staff/staff.module';
 import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { PromotionModule } from './modules/promotion/promotion.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AuthModule } from './modules/auth/auth.module';
     StockModule,
     SupplierModule,
     AuthModule,
+    PromotionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
