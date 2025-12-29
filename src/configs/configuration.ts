@@ -27,4 +27,13 @@ export default () => ({
   bcrypt: {
     saltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
   },
+
+  // VNPay
+  vnpay: {
+    tmnCode: process.env.VNPAY_TMN_CODE,
+    secretKey: process.env.VNPAY_SECRET_KEY,
+    returnUrl: process.env.VNPAY_RETURN_URL ?? 'http://localhost:3000/payment/vnpay/return',
+    ipnUrl: process.env.VNPAY_IPN_URL ?? 'http://localhost:3000/payment/vnpay/ipn',
+    url: process.env.VNPAY_URL ?? 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+  },
 });
