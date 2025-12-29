@@ -1,56 +1,112 @@
-import { plainToInstance } from 'class-transformer';
-import { IsArray, IsDateString, IsNumber, IsOptional, IsString, IsUrl, validateSync } from 'class-validator';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
-export class BookSchema {
-  @IsOptional()
-  @IsString()
-  _id?: string;
+export type BookDocument = HydratedDocument<Book>;
 
-  @IsString()
+@Schema({ timestamps: true })
+export class Book {
+  // ===== BASIC =====
+  @Prop({ trim: true, required: true })
   title: string;
 
-  @IsOptional()
-  @IsString()
-  author?: string;
+  @Prop({ trim: true, required: true, lowercase: true, unique: true, index: true })
+  slug: string;
 
-  @IsOptional()
-  @IsString()
-  isbn?: string;
+  @Prop({ trim: true })
+  subtitle?: string;
 
-  @IsOptional()
-  @IsString()
+  @Prop({ trim: true })
   description?: string;
 
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  categories?: string[];
+  // Authors: simple string array is easiest for MVP
+  @Prop({ type: [String], default: [] })
+  authors: string[];
 
-  @IsOptional()
-  @IsDateString()
-  publishedDate?: string;
+  // Optional
+  @Prop({ trim: true })
+  language?: string;
 
-  @IsOptional()
-  @IsUrl()
-  coverUrl?: string;
+  @Prop()
+  publishDate?: Date;
 
-  @IsOptional()
-  @IsNumber()
-  pages?: number;
+  @Prop()
+  pageCount?: number;
 
-  @IsOptional()
-  @IsString()
-  publisher?: string;
+  // Unique book identity - Mã định danh cho sách
+  @Prop({ trim: true, unique: true, sparse: true, index: true })
+  isbn?: string;
+
+  // Publisher (NXB)
+  @Prop({ type: Types.ObjectId, required: true, index: true })
+  publisherId: Types.ObjectId;
+
+  // Categories (many-to-many) -> store ids array for easy filter
+  @Prop({ type: [Types.ObjectId], ref: 'Category', default: [], index: true })
+  categoryIds: Types.ObjectId[];
+
+  // ===== PRICING =====
+  @Prop({ required: true, min: 0 })
+  basePrice: number;
+
+  @Prop({ min: 0 })
+  originalPrice?: number;
+
+  // Optional: currency if you care later
+  @Prop({ default: 'VND' })
+  currency: string;
+
+  // Media images
+  @Prop({
+    type: [
+      {
+        kind: { type: String, enum: ['cover', 'gallery'], required: true },
+        mediaId: { type: Types.ObjectId, ref: 'Media', required: true },
+        url: { type: String, required: true },
+      },
+    ],
+    default: [],
+  })
+  images: { kind: 'cover' | 'gallery'; mediaId: Types.ObjectId; url: string }[];
+
+  @Prop({ trim: true })
+  thumbnailUrl?: string;
+
+  // number (no enum): 1 active, 0 inactive, 2 hidden, 3 draft, 4 out_of_stock
+  @Prop({ default: 1, index: true })
+  status: number;
+
+  @Prop({ default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop()
+  deletedAt?: Date;
+
+  @Prop({ default: 0, index: true })
+  soldCount: number;
+
+  // Ratings summary (if you have ReviewsModule later)
+  // @Prop({ default: 0 })
+  // ratingAvg: number;
+
+  // @Prop({ default: 0 })
+  // ratingCount: number;
+
+  // Tags for quick filtering/search
+  @Prop({ type: [String], default: [], index: true })
+  tags: string[];
+
+  @Prop({ default: 0 })
+  stockOnHand?: number;
+
+  @Prop({ default: 0 })
+  stockReserved?: number;
 }
 
-export function validateBook(obj: unknown): { valid: boolean; errors?: any[]; value?: BookSchema } {
-  const inst = plainToInstance(BookSchema, obj);
-  const errors = validateSync(inst, { whitelist: true, forbidNonWhitelisted: false });
-  if (errors.length > 0) {
-    const mapped = errors.map((e) => ({ property: e.property, constraints: e.constraints }));
-    return { valid: false, errors: mapped };
-  }
-  return { valid: true, value: inst };
-}
+export const BookSchema = SchemaFactory.createForClass(Book);
 
-export type BookDocument = Omit<BookSchema, '_id'> & { _id?: string };
+// ===== INDEXES =====
+BookSchema.index({ isDeleted: 1, status: 1, publisherId: 1, createdAt: -1 });
+BookSchema.index({ categoryIds: 1, isDeleted: 1, status: 1, createdAt: -1 });
+BookSchema.index({ soldCount: -1, isDeleted: 1, status: 1 });
+BookSchema.index({ title: 1 });
+BookSchema.index({ authors: 1 });

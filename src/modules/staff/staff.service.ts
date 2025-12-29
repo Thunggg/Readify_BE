@@ -49,9 +49,13 @@ export class StaffService {
 
     // FILTER
     const filter: any = {
-      role: { $in: this.STAFF_ROLES },
+      role: {
+        $in: this.STAFF_ROLES,
+        $ne: AccountRole.ADMIN,
+      },
       status: { $ne: AccountStatus.BANNED },
     };
+    
     if (isDeleted === true) filter.isDeleted = true;
     else filter.isDeleted = { $ne: true };
 
@@ -140,7 +144,7 @@ export class StaffService {
         limit: validLimit,
         total,
       },
-      'Lấy danh sách nhân viên thành công',
+      'Staff list retrieved successfully',
     );
   }
 
@@ -153,7 +157,6 @@ export class StaffService {
       .findOne({
         _id: id,
         role: { $in: this.STAFF_ROLES },
-        status: { $ne: AccountStatus.BANNED },
       })
       .select({
         firstName: 1,
@@ -176,10 +179,22 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Staff not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(staff, 'Lấy chi tiết nhân viên thành công');
+    return ApiResponse.success(staff, 'Staff details retrieved successfully');
   }
 
   async addStaff(dto: CreateStaffDto) {
+    if (dto.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([
+          {
+            field: 'role',
+            message: 'Cannot create admin account. Admin account can only be added directly to database',
+          },
+        ]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (!this.STAFF_ROLES.includes(dto.role)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'role', message: 'Role is not a staff role' }]),
@@ -196,9 +211,9 @@ export class StaffService {
         HttpStatus.BAD_REQUEST,
       );
     }
-
+  
     // Hash password
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await hashPassword(dto.password, Number(this.configService.get<number>('bcrypt.saltRounds')));
 
     const created = await this.accountModel.create({
       firstName: dto.firstName?.trim(),
@@ -229,7 +244,7 @@ export class StaffService {
       updatedAt: (created as any).updatedAt,
     };
 
-    return ApiResponse.success(data, 'Tạo nhân viên thành công');
+    return ApiResponse.success(data, 'Staff created successfully');
   }
 
   // Edit Staff
@@ -250,7 +265,21 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
     }
 
+    if (staff.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Cannot edit admin account' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     // role update validation
+    if (dto.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'role', message: 'Cannot change role to admin' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (dto.role !== undefined && !this.STAFF_ROLES.includes(dto.role)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'role', message: 'Role is not a staff role' }]),
@@ -303,7 +332,7 @@ export class StaffService {
       updatedAt: (saved as any).updatedAt,
     };
 
-    return ApiResponse.success(data, 'Cập nhật nhân viên thành công');
+    return ApiResponse.success(data, 'Staff updated successfully');
   }
 
   // Delete Staff (soft delete)
@@ -324,6 +353,13 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
     }
 
+    if (staff.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Cannot delete admin account' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (staff.isDeleted === true) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'id', message: 'Staff already deleted' }]),
@@ -335,7 +371,7 @@ export class StaffService {
     staff.isDeleted = true;
     await staff.save();
 
-    return ApiResponse.success({ _id: id }, 'Xoá nhân viên thành công');
+    return ApiResponse.success({ _id: id }, 'Staff deleted successfully');
   }
 
   async restoreStaff(id: string) {
@@ -355,6 +391,13 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
     }
 
+    if (staff.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Cannot restore admin account' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (staff.isDeleted !== true) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'id', message: 'Staff is not deleted' }]),
@@ -365,7 +408,7 @@ export class StaffService {
     staff.isDeleted = false;
     await staff.save();
 
-    return ApiResponse.success({ _id: id }, 'Khôi phục nhân viên thành công');
+    return ApiResponse.success({ _id: id }, 'Staff restored successfully');
   }
 
   async updateStaffStatus(id: string, dto: UpdateStaffStatusDto) {
@@ -385,10 +428,17 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
     }
 
+    if (staff.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Cannot update admin account status' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     staff.status = dto.status;
     await staff.save();
 
-    return ApiResponse.success({ _id: id, status: dto.status }, 'Cập nhật trạng thái nhân viên thành công');
+    return ApiResponse.success({ _id: id, status: dto.status }, 'Staff status updated successfully');
   }
 
   async updateStaffRole(id: string, dto: UpdateStaffRoleDto) {
@@ -408,6 +458,20 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Account is not staff'), HttpStatus.NOT_FOUND);
     }
 
+    if (staff.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Cannot update admin account role' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.role === AccountRole.ADMIN) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'role', message: 'Cannot change role to admin' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (!this.STAFF_ROLES.includes(dto.role)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'role', message: 'Role is not a staff role' }]),
@@ -418,6 +482,6 @@ export class StaffService {
     staff.role = dto.role;
     await staff.save();
 
-    return ApiResponse.success({ _id: id, role: dto.role }, 'Cập nhật vai trò nhân viên thành công');
+    return ApiResponse.success({ _id: id, role: dto.role }, 'Staff role updated successfully');
   }
 }
