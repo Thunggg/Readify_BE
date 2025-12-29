@@ -11,6 +11,7 @@ import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
+import { PromotionLogModule } from './modules/promotion-log/promotion-log.module';
 import { OrderModule } from './modules/order/order.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { OrderModule } from './modules/order/order.module';
     SupplierModule,
     AuthModule,
     PromotionModule,
+    PromotionLogModule,
     OrderModule,
   ],
   controllers: [AppController],

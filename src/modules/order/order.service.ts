@@ -10,6 +10,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderSortBy, SortOrder } from './constants/order.enum';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 import { Promotion, PromotionDocument } from '../promotion/schemas/promotion.schema';
+import { PromotionLogService } from '../promotion-log/promotion-log.service';
 
 import { ApiResponse } from '../../shared/responses/api-response';
 
@@ -30,6 +31,7 @@ export class OrderService {
     private readonly promotionModel: Model<PromotionDocument>,
     @InjectConnection()
     private readonly connection: Connection,
+    private readonly promotionLogService: PromotionLogService,
   ) {}
 
   async getOrderList(query: SearchOrderDto, currentUser: string) {
@@ -306,6 +308,25 @@ export class OrderService {
       await this.promotionModel.findByIdAndUpdate(promotionId, {
         $inc: { usedCount: 1 },
       });
+
+      const promotionData = await this.promotionModel.findById(promotionId).lean();
+      if (promotionData) {
+        await this.promotionLogService.createLog({
+          promotionId: promotionId.toString(),
+          promotionCode: promotionData.code,
+          promotionName: promotionData.name,
+          action: 'APPLY',
+          performedBy: orderUserId.toString(),
+          newData: {
+            orderId: newOrder._id.toString(),
+            orderCode: orderCode,
+            discountAmount: createDto.discountAmount,
+            finalAmount: createDto.finalAmount,
+            totalAmount: createDto.totalAmount,
+          },
+          note: `Customer applied promotion ${promotionData.code} for order ${orderCode}`,
+        });
+      }
     }
 
     const order = await this.orderModel
