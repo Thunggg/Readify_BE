@@ -1,56 +1,36 @@
-import { plainToInstance } from 'class-transformer';
-import { IsArray, IsDateString, IsNumber, IsOptional, IsString, IsUrl, validateSync } from 'class-validator';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument } from 'mongoose';
 
-export class BookSchema {
-  @IsOptional()
-  @IsString()
-  _id?: string;
+export type BookDocument = HydratedDocument<Book>;
 
-  @IsString()
+@Schema({ collection: 'books' })
+export class Book {
+  @Prop({ required: true })
   title: string;
 
-  @IsOptional()
-  @IsString()
+  @Prop()
   author?: string;
 
-  @IsOptional()
-  @IsString()
+  @Prop()
   isbn?: string;
 
-  @IsOptional()
-  @IsString()
+  @Prop()
   description?: string;
 
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
+  @Prop({ type: [String] })
   categories?: string[];
 
-  @IsOptional()
-  @IsDateString()
+  @Prop()
   publishedDate?: string;
 
-  @IsOptional()
-  @IsUrl()
+  @Prop()
   coverUrl?: string;
 
-  @IsOptional()
-  @IsNumber()
+  @Prop()
   pages?: number;
 
-  @IsOptional()
-  @IsString()
+  @Prop()
   publisher?: string;
 }
 
-export function validateBook(obj: unknown): { valid: boolean; errors?: any[]; value?: BookSchema } {
-  const inst = plainToInstance(BookSchema, obj);
-  const errors = validateSync(inst, { whitelist: true, forbidNonWhitelisted: false });
-  if (errors.length > 0) {
-    const mapped = errors.map((e) => ({ property: e.property, constraints: e.constraints }));
-    return { valid: false, errors: mapped };
-  }
-  return { valid: true, value: inst };
-}
-
-export type BookDocument = Omit<BookSchema, '_id'> & { _id?: string };
+export const BookSchema = SchemaFactory.createForClass(Book);
