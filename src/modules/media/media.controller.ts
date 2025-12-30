@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Param, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UploadMediaDto } from './dto/upload-media.dto';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UploadMediaDto } from './dto/upload-media.dto';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
