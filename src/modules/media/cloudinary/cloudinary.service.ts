@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { CLOUDINARY } from './cloudinary.provider';
+import { ApiResponse } from 'src/shared/responses/api-response';
 
 type CloudinaryV2 = typeof cloudinary;
 
@@ -27,9 +28,7 @@ export class CloudinaryService {
         },
         (err, result) => {
           if (err) {
-            const error =
-              err instanceof Error ? err : new Error(typeof err === 'string' ? err : JSON.stringify(err));
-            return reject(error);
+            return reject(new HttpException(ApiResponse.error('Upload failed', 'UPLOAD_FAILED', 500), 500));
           }
 
           resolve({
