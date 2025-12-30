@@ -170,6 +170,13 @@ export class OtpService {
 
     const html = this.buildOtpHtml({ displayDate, name, otp, expiresInMinutes });
 
+    await this.mail.sendEmail({
+      to: email,
+      subject: 'OTP Verification',
+      text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+      html,
+    });
+
     // Upsert to avoid duplicate key errors on (email, purpose)
     await this.otpModel.updateOne(
       { email, purpose },
@@ -187,12 +194,6 @@ export class OtpService {
       },
       { upsert: true },
     );
-    await this.mail.sendEmail({
-      to: email,
-      subject: 'OTP Verification',
-      text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
-      html,
-    });
 
     return ApiResponse.success(null, 'OTP sent successfully', 200);
   }
@@ -255,11 +256,6 @@ export class OtpService {
     const expiresInMinutes = this.expiresInMinutes;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
 
-    await this.otpModel.updateOne(
-      { _id: record._id },
-      { $set: { otpHash, expiresAt, lastSentAt: new Date() }, $inc: { resendCount: 1 } },
-    );
-
     const html = this.buildOtpHtml({ displayDate, name, otp, expiresInMinutes });
 
     await this.mail.sendEmail({
@@ -268,6 +264,11 @@ export class OtpService {
       text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
       html,
     });
+
+    await this.otpModel.updateOne(
+      { _id: record._id },
+      { $set: { otpHash, expiresAt, lastSentAt: new Date() }, $inc: { resendCount: 1 } },
+    );
 
     return ApiResponse.success(null, 'OTP resent successfully', 200);
   }
