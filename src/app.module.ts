@@ -32,8 +32,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     BookModule,
     AuthModule,
     CartModule,
-    MediaModule
-    UploadsModule,
+    MediaModule,
+    UploadsModule
   ],
   controllers: [AppController],
   providers: [AppService],
