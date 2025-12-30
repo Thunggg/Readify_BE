@@ -23,6 +23,8 @@ import { SearchAccountDto } from './dto/search-account.dto';
 import { ForgotPasswordRequestDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Controller('accounts')
 export class AccountsController {
@@ -43,6 +45,12 @@ export class AccountsController {
   @UseGuards(JwtAuthGuard)
   updateMe(@Req() req: any, @Body() dto: UpdateProfileDto) {
     return this.accountsService.updateProfile(req?.user?.userId as string, dto);
+  }
+
+  @Patch('me/change-password')
+  @UseGuards(JwtAuthGuard)
+  changePassword(@Req() req: any, @Body() dto: ChangePasswordDto): Promise<SuccessResponse<null>> {
+    return this.accountsService.changePassword(req?.user?.userId as string, dto);
   }
 
   @Post('upload')

@@ -6,7 +6,7 @@ import { ApiResponse } from 'src/shared/responses/api-response';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ErrorResponse } from 'src/shared/responses/error.response';
-import { hashPassword } from 'src/shared/utils/bcrypt';
+import { comparePassword, hashPassword } from 'src/shared/utils/bcrypt';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { AccountRole, AccountStatus, SortOrder, StaffSortBy } from '../staff/constants/staff.enum';
 import { UpdateAccountDto } from './dto/edit-account.dto';
@@ -16,12 +16,16 @@ import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
 
 @Injectable()
 export class AccountsService {
   constructor(
     @InjectModel(Account.name)
     private readonly accountModel: Model<AccountDocument>,
+    @InjectModel(RefreshToken.name)
+    private readonly refreshTokenModel: Model<RefreshTokenDocument>,
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
   ) {}
@@ -107,6 +111,55 @@ export class AccountsService {
     const { password, ...accountData } = saved.toObject();
 
     return ApiResponse.success(accountData, 'Profile updated successfully', 200);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new HttpException(
+        ApiResponse.error('Invalid account id', 'INVALID_ACCOUNT_ID', HttpStatus.BAD_REQUEST),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new HttpException(
+        ErrorResponse.badRequest('New password and confirm password do not match'),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.currentPassword === dto.newPassword) {
+      throw new HttpException(ErrorResponse.badRequest('New password must be different'), HttpStatus.BAD_REQUEST);
+    }
+
+    const account = await this.accountModel.findById(userId).select('+password');
+
+    if (!account || account.isDeleted === true) {
+      throw new HttpException(
+        ApiResponse.error('Account not found', 'ACCOUNT_NOT_FOUND', HttpStatus.NOT_FOUND),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (account.status === AccountStatus.BANNED) {
+      throw new HttpException(
+        ApiResponse.error('Account is banned', 'ACCOUNT_BANNED', HttpStatus.FORBIDDEN),
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const ok = await comparePassword(dto.currentPassword, account.password);
+    if (!ok) {
+      throw new HttpException(ErrorResponse.badRequest('Current password is incorrect'), HttpStatus.BAD_REQUEST);
+    }
+
+    account.password = await hashPassword(dto.newPassword, Number(this.configService.get<number>('bcrypt.saltRounds')));
+    const saved = await account.save();
+
+    // Security: invalidate refresh tokens so user must login again on other devices
+    await this.refreshTokenModel.deleteMany({ userId: saved._id });
+
+    return ApiResponse.success(null, 'Password changed successfully', 200);
   }
 
   async uploadFile(file: Express.Multer.File) {
