@@ -31,8 +31,39 @@ export class CategoriesService {
       );
     }
 
+    // Generate slug from name
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphen
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+
+    // Check if slug already exists
+    const existingSlug = await this.categoryModel.findOne({
+      slug,
+      isDeleted: { $ne: true },
+    });
+
+    if (existingSlug) {
+      // If slug exists, append timestamp
+      const timestamp = Date.now();
+      const uniqueSlug = `${slug}-${timestamp}`;
+      
+      const category = await this.categoryModel.create({
+        name,
+        slug: uniqueSlug,
+        description: dto.description?.trim(),
+        isDeleted: false,
+      });
+
+      const categoryData = category.toObject();
+      return ApiResponse.success(categoryData, 'Tạo danh mục thành công', 201);
+    }
+
     const category = await this.categoryModel.create({
       name,
+      slug,
       description: dto.description?.trim(),
       isDeleted: false,
     });
@@ -92,7 +123,11 @@ export class CategoriesService {
         .select({
           _id: 1,
           name: 1,
+          slug: 1,
           description: 1,
+          iconUrl: 1,
+          sortOrder: 1,
+          status: 1,
           createdAt: 1,
           updatedAt: 1,
         })
@@ -129,7 +164,11 @@ export class CategoriesService {
       .select({
         _id: 1,
         name: 1,
+        slug: 1,
         description: 1,
+        iconUrl: 1,
+        sortOrder: 1,
+        status: 1,
         createdAt: 1,
         updatedAt: 1,
       })
@@ -183,6 +222,29 @@ export class CategoriesService {
       }
 
       category.name = newName;
+      
+      // Generate new slug from new name
+      const newSlug = newName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphen
+        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+
+      // Check if new slug already exists (excluding current category)
+      const existingSlug = await this.categoryModel.findOne({
+        slug: newSlug,
+        _id: { $ne: category._id },
+        isDeleted: { $ne: true },
+      });
+
+      if (existingSlug) {
+        // If slug exists, append timestamp
+        const timestamp = Date.now();
+        category.slug = `${newSlug}-${timestamp}`;
+      } else {
+        category.slug = newSlug;
+      }
     }
 
     if (dto.description !== undefined) {
@@ -218,6 +280,7 @@ export class CategoriesService {
 
     // Soft delete
     category.isDeleted = true;
+    category.deletedAt = new Date();
     await category.save();
 
     return ApiResponse.success({ _id: categoryId }, 'Xóa danh mục thành công', 200);

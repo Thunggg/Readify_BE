@@ -1,0 +1,1385 @@
+{
+	"info": {
+		"name": "Readify API",
+		"description": "API Collection for Readify Backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Get Hello",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/",
+							"host": ["{{baseUrl}}"],
+							"path": [""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.accessToken) {",
+									"        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "logout"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Accounts",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/accounts/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", "register"]
+						}
+					}
+				},
+				{
+					"name": "Get Me",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/accounts/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", "me"]
+						}
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Doe Updated\",\n  \"phone\": \"0987654321\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/accounts/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", "me"]
+						}
+					}
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"oldPassword\": \"oldpassword123\",\n  \"newPassword\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/accounts/me/change-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", "me", "change-password"]
+						}
+					}
+				},
+				{
+					"name": "Get Account List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/accounts?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Account Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/accounts/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "account_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/accounts/forgot-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", "forgot-password"]
+						}
+					}
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/accounts/reset-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["accounts", "reset-password"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "OTP",
+			"item": [
+				{
+					"name": "Send OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"purpose\": \"REGISTRATION\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/otp/send",
+							"host": ["{{baseUrl}}"],
+							"path": ["otp", "send"]
+						}
+					}
+				},
+				{
+					"name": "Re-send OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"purpose\": \"REGISTRATION\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/otp/re-send",
+							"host": ["{{baseUrl}}"],
+							"path": ["otp", "re-send"]
+						}
+					}
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\",\n  \"purpose\": \"REGISTRATION\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/otp/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["otp", "verify"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Books (Public)",
+			"item": [
+				{
+					"name": "Get Books List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["book"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Search Books",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book?q=search_term&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["book"],
+							"query": [
+								{
+									"key": "q",
+									"value": "search_term",
+									"description": "Search keyword"
+								},
+								{
+									"key": "categoryId",
+									"value": "",
+									"description": "Filter by category",
+									"disabled": true
+								},
+								{
+									"key": "minPrice",
+									"value": "",
+									"description": "Minimum price",
+									"disabled": true
+								},
+								{
+									"key": "maxPrice",
+									"value": "",
+									"description": "Maximum price",
+									"disabled": true
+								},
+								{
+									"key": "inStock",
+									"value": "",
+									"description": "Filter in stock only",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Sort Books",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book?sort=newest&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["book"],
+							"query": [
+								{
+									"key": "sort",
+									"value": "newest",
+									"description": "Sort options: newest, oldest, price_asc, price_desc, best_selling, rating_desc"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Book Suggestions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book/suggestions?q=search_term",
+							"host": ["{{baseUrl}}"],
+							"path": ["book", "suggestions"],
+							"query": [
+								{
+									"key": "q",
+									"value": "search_term"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Book Detail by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["book", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "book_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Book Detail by Slug",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book/slug/:slug",
+							"host": ["{{baseUrl}}"],
+							"path": ["book", "slug", ":slug"],
+							"variable": [
+								{
+									"key": "slug",
+									"value": "book-slug-here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Related Books",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/book/:id/related?limit=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["book", ":id", "related"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "book_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Books (Admin)",
+			"item": [
+				{
+					"name": "Get Admin Book List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/book?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "book"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Book",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Book Title\",\n  \"author\": \"Author Name\",\n  \"description\": \"Book description\",\n  \"price\": 100000,\n  \"stock\": 50\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/book",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "book"]
+						}
+					}
+				},
+				{
+					"name": "Update Book",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Book Title\",\n  \"price\": 120000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/book/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "book", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "book_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Book",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/book/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "book", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "book_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Cart",
+			"item": [
+				{
+					"name": "Add to Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookId\": \"book_id_here\",\n  \"quantity\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					}
+				},
+				{
+					"name": "Get Cart",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					}
+				},
+				{
+					"name": "Get Cart Count",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart/count",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "count"]
+						}
+					}
+				},
+				{
+					"name": "Update Cart Item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookId\": \"book_id_here\",\n  \"quantity\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					}
+				},
+				{
+					"name": "Remove from Cart",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart/:bookId",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", ":bookId"],
+							"variable": [
+								{
+									"key": "bookId",
+									"value": "book_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Clear Cart",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Promotions",
+			"item": [
+				{
+					"name": "Get Promotion List",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/promotions?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["promotions"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Promotion Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/promotions/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["promotions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "promotion_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Promotion",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"PROMO123\",\n  \"discount\": 10,\n  \"type\": \"PERCENTAGE\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/promotions",
+							"host": ["{{baseUrl}}"],
+							"path": ["promotions"]
+						}
+					}
+				},
+				{
+					"name": "Apply Promotion",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"PROMO123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/promotions/apply",
+							"host": ["{{baseUrl}}"],
+							"path": ["promotions", "apply"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Suppliers",
+			"item": [
+				{
+					"name": "Get Supplier List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/suppliers?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["suppliers"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Supplier Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/suppliers/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["suppliers", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "supplier_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Supplier",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Supplier Name\",\n  \"contact\": \"contact@supplier.com\",\n  \"phone\": \"0123456789\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/suppliers",
+							"host": ["{{baseUrl}}"],
+							"path": ["suppliers"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Categories",
+			"item": [
+				{
+					"name": "Get Categories List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/categories?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Category Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/categories/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "category_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Category Name\",\n  \"description\": \"Category description\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories"]
+						}
+					}
+				},
+				{
+					"name": "Search Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/categories?q=search_term&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories"],
+							"query": [
+								{
+									"key": "q",
+									"value": "search_term",
+									"description": "Search in name and description"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt",
+									"description": "Sort by: name, createdAt, updatedAt",
+									"disabled": true
+								},
+								{
+									"key": "order",
+									"value": "desc",
+									"description": "Sort order: asc, desc",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Edit Category",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Category Name\",\n  \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/categories/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "category_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Category",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/categories/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "category_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Get Order List",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Order Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "order_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Order - Pay by COD",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"items\": [\n    {\n      \"bookId\": \"book_id_here\",\n      \"title\": \"Book Title\",\n      \"quantity\": 1,\n      \"unitPrice\": 100000,\n      \"subtotal\": 100000\n    }\n  ],\n  \"totalAmount\": 100000,\n  \"discountAmount\": 0,\n  \"finalAmount\": 100000,\n  \"shippingAddress\": \"123 Main Street, City, Country\",\n  \"paymentMethod\": \"COD\",\n  \"note\": \"Please deliver in the morning\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						}
+					}
+				},
+				{
+					"name": "Create Order - Pay by VNPay",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"items\": [\n    {\n      \"bookId\": \"book_id_here\",\n      \"title\": \"Book Title\",\n      \"quantity\": 1,\n      \"unitPrice\": 100000,\n      \"subtotal\": 100000\n    }\n  ],\n  \"totalAmount\": 100000,\n  \"discountAmount\": 0,\n  \"finalAmount\": 100000,\n  \"shippingAddress\": \"123 Main Street, City, Country\",\n  \"paymentMethod\": \"VNPAY\",\n  \"note\": \"Payment via VNPay\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						}
+					}
+				},
+				{
+					"name": "Get Order History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/history?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "history"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Cancel Order",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/:id/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", ":id", "cancel"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "order_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Get Notifications List",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications"],
+							"query": [
+								{
+									"key": "type",
+									"value": "",
+									"description": "Filter by type: ORDER, PROMOTION, SYSTEM, ACCOUNT, OTHER",
+									"disabled": true
+								},
+								{
+									"key": "isRead",
+									"value": "",
+									"description": "Filter by read status: true/false",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Notification Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "notification_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Add Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Thông báo mới\",\n  \"content\": \"Nội dung thông báo chi tiết\",\n  \"type\": \"SYSTEM\",\n  \"relatedOrderId\": null,\n  \"relatedPromotionId\": null\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/notifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications"]
+						}
+					}
+				},
+				{
+					"name": "Update Notification (Mark as Read)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isRead\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/notifications/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "notification_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "notification_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Mark All as Read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/mark-all-read",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", "mark-all-read"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
+
