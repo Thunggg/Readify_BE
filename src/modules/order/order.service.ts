@@ -17,10 +17,10 @@ import { ApiResponse } from '../../shared/responses/api-response';
 @Injectable()
 export class OrderService {
   // 0: user, 1: admin, 2: seller, 3: warehouse, 4: staff, 5: seller
-  private readonly ALLOWED_ROLES_VIEW_ALL = [4, 3, 1]; // Admin, Warehouse, Staff
-  private readonly ALLOWED_ROLES_VIEW_DETAIL = [4, 3, 1, 0]; // Admin, Warehouse, Staff, Customer
-  private readonly ALLOWED_ROLES_CREATE = [4, 3, 1, 0]; // Admin, Warehouse, Staff, Customer
-  private readonly ALLOWED_ROLES_UPDATE = [5, 3, 1]; // Admin, Warehouse, Seller
+  private readonly ALLOWED_ROLES_VIEW_ALL = [1, 2, 3]; // Admin, Warehouse, Staff
+  private readonly ALLOWED_ROLES_VIEW_DETAIL = [0, 1, 2, 3]; // Admin, Warehouse, Staff, Customer
+  private readonly ALLOWED_ROLES_CREATE = [0]; //  Customer
+  private readonly ALLOWED_ROLES_UPDATE = [1, 2, 3]; // Admin, Warehouse, Staff
 
   constructor(
     @InjectModel(Order.name)

@@ -13,7 +13,7 @@ import { PaginatedResponse } from '../../shared/responses/paginated.response';
 
 @Injectable()
 export class PromotionLogService {
-  private readonly ALLOWED_ROLES_VIEW = [4, 1];
+  private readonly ALLOWED_ROLES_VIEW = [1];
 
   constructor(
     @InjectModel(PromotionLog.name)
