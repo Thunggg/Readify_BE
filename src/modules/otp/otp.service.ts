@@ -1,14 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MailService } from '../mail/mail.service';
 import { EmailOtp, EmailOtpDocument } from './schemas/email-otp.schema';
 import { SendOtpDto } from './dto/send-otp.dto';
-import { hashPassword } from 'src/shared/utils/bcrypt';
+import { comparePassword, hashPassword } from 'src/shared/utils/bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { ApiResponse } from 'src/shared/responses/api-response';
-
-type OtpPurpose = 'register';
+import { ErrorResponse } from 'src/shared/responses/error.response';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Injectable()
 export class OtpService {
@@ -23,20 +23,31 @@ export class OtpService {
     return String(n).padStart(6, '0');
   }
 
-  async sendOtp(dto: SendOtpDto) {
-    const { email, purpose } = dto;
+  private get expiresInMinutes(): number {
+    return Number(this.configService.get<number>('otp.expiresInMinutes') ?? 5);
+  }
 
-    const otp = this.makeOtp();
-    const otpHash = await hashPassword(otp, this.configService.get<number>('bcrypt.saltRounds') as number);
-    const expiresInMinutes = 5; // 5 phút
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+  private get cooldownMs(): number {
+    return Number(this.configService.get<number>('otp.cooldownMs') ?? 60_000);
+  }
 
-    const now = new Date();
-    const displayDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  private get blockMs(): number {
+    return Number(this.configService.get<number>('otp.blockMs') ?? 15 * 60_000);
+  }
 
-    const name = email?.includes('@') ? email.split('@')[0] : 'there';
+  private get maxResendCount(): number {
+    return Number(this.configService.get<number>('otp.maxResendCount') ?? 10);
+  }
 
-    const html = `<!DOCTYPE html>
+  private get maxAttempts(): number {
+    return Number(this.configService.get<number>('otp.maxAttempts') ?? 10);
+  }
+
+  private buildOtpHtml(params: { displayDate: string; name: string; otp: string; expiresInMinutes: number }): string {
+    const { displayDate, name, otp, expiresInMinutes } = params;
+    const year = new Date().getFullYear();
+
+    return `<!DOCTYPE html>
         <html lang="en">
           <head>
             <meta charset="UTF-8" />
@@ -131,20 +142,213 @@ export class OtpService {
               >
                 <p style="margin: 0; margin-top: 40px; font-size: 16px; font-weight: 600; color: #434343;">Readify</p>
                 <p style="margin: 0; margin-top: 8px; color: #434343;">This is an automated message. Please do not share your OTP.</p>
-                <p style="margin: 0; margin-top: 16px; color: #434343;">Copyright © ${now.getFullYear()} Readify.</p>
+                <p style="margin: 0; margin-top: 16px; color: #434343;">Copyright © ${year} Readify.</p>
               </footer>
             </div>
           </body>
         </html>`;
+  }
 
-    await this.otpModel.create({ email, otpHash, purpose, expiresAt, lastSentAt: new Date() });
-    await this.mail.sendEmail({
-      to: email,
-      subject: 'OTP Verification',
-      text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
-      html,
-    });
+  async sendOtp(dto: SendOtpDto) {
+    const email = dto.email.trim().toLowerCase();
+    const { purpose } = dto;
+
+    const record = await this.otpModel.findOne({ email, purpose });
+    if (record) {
+      throw new HttpException(ErrorResponse.badRequest('OTP already sent'), HttpStatus.BAD_REQUEST);
+    }
+
+    const otp = this.makeOtp();
+    const otpHash = await hashPassword(otp, this.configService.get<number>('bcrypt.saltRounds') as number);
+    const expiresInMinutes = this.expiresInMinutes;
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+    const now = new Date();
+    const displayDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    const name = email?.includes('@') ? email.split('@')[0] : 'there';
+
+    const html = this.buildOtpHtml({ displayDate, name, otp, expiresInMinutes });
+
+    // Upsert to avoid duplicate key errors on (email, purpose)
+    await this.otpModel.updateOne(
+      { email, purpose },
+      {
+        $set: {
+          email,
+          purpose,
+          otpHash,
+          expiresAt,
+          lastSentAt: now,
+          attempts: 0,
+          resendCount: 0,
+          blockedUntil: undefined,
+        },
+      },
+      { upsert: true },
+    );
+
+    try {
+      await this.mail.sendEmail({
+        to: email,
+        subject: 'OTP Verification',
+        text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+        html,
+      });
+    } catch (err) {
+      // roll back tránh lưu OTP không gửi được
+      await this.otpModel.deleteOne({ email, purpose });
+      throw new HttpException(ErrorResponse.internal('Failed to send OTP email'), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
     return ApiResponse.success(null, 'OTP sent successfully', 200);
+  }
+
+  async reSendOtp(dto: SendOtpDto) {
+    const email = dto.email.trim().toLowerCase();
+    const { purpose } = dto;
+
+    const record = await this.otpModel.findOne({ email, purpose });
+
+    if (!record) {
+      throw new HttpException(ErrorResponse.notFound('OTP record not found'), HttpStatus.NOT_FOUND);
+    }
+
+    // Trường hợp bị block
+    if (record.blockedUntil && record.blockedUntil > new Date()) {
+      const waitSecond = Math.ceil((new Date(record.blockedUntil).getTime() - Date.now()) / 1000);
+      throw new HttpException(
+        ErrorResponse.badRequest(`You must wait ${waitSecond} seconds before requesting a new OTP`),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Trường hợp đã hết thời gian chờ
+    if (record.blockedUntil && record.blockedUntil.getTime() < Date.now()) {
+      record.blockedUntil = undefined;
+      record.resendCount = 0;
+      await record.save();
+    }
+
+    // Check cooldown
+    const cooldownMs = this.cooldownMs;
+    if (record.lastSentAt && Date.now() - new Date(record.lastSentAt).getTime() < cooldownMs) {
+      throw new HttpException(
+        ErrorResponse.badRequest(`You must wait ${Math.ceil(cooldownMs / 1000)} seconds before requesting a new OTP`),
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const blockMs = this.blockMs;
+    const maxResend = this.maxResendCount;
+    // Check maximum resend count
+    if (record.resendCount >= maxResend) {
+      record.blockedUntil = new Date(Date.now() + blockMs);
+
+      await record.save();
+
+      throw new HttpException(
+        ErrorResponse.badRequest('You have reached the maximum number of resends'),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const now = new Date();
+    const displayDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const name = email?.includes('@') ? email.split('@')[0] : 'there';
+
+    const otp = this.makeOtp();
+    const otpHash = await hashPassword(otp, this.configService.get<number>('bcrypt.saltRounds') as number);
+    const expiresInMinutes = this.expiresInMinutes;
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+    const html = this.buildOtpHtml({ displayDate, name, otp, expiresInMinutes });
+
+    // Update DB first to ensure OTP in email matches what we verify against.
+    // If email sending fails, revert to the previous OTP fields.
+    const prev = {
+      otpHash: record.otpHash,
+      expiresAt: record.expiresAt,
+      lastSentAt: record.lastSentAt,
+      resendCount: record.resendCount,
+    };
+
+    await this.otpModel.updateOne(
+      { _id: record._id },
+      { $set: { otpHash, expiresAt, lastSentAt: now }, $inc: { resendCount: 1 } },
+    );
+
+    try {
+      await this.mail.sendEmail({
+        to: email,
+        subject: 'OTP Verification',
+        text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+        html,
+      });
+    } catch (err) {
+      // rollback lại OTP cũ để tránh lưu OTP không gửi được
+      await this.otpModel.updateOne(
+        { _id: record._id },
+        {
+          $set: {
+            otpHash: prev.otpHash,
+            expiresAt: prev.expiresAt,
+            lastSentAt: prev.lastSentAt,
+            resendCount: prev.resendCount,
+          },
+        },
+      );
+      throw new HttpException(ErrorResponse.internal('Failed to send OTP email'), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    return ApiResponse.success(null, 'OTP resent successfully', 200);
+  }
+
+  async verifyOtp(dto: VerifyOtpDto) {
+    const email = dto.email.trim().toLowerCase();
+    const { otp, purpose } = dto;
+
+    const record = await this.otpModel.findOne({ email, purpose });
+
+    if (!record) {
+      throw new HttpException(ErrorResponse.notFound('OTP record not found'), HttpStatus.NOT_FOUND);
+    }
+
+    if (record.expiresAt < new Date()) {
+      throw new HttpException(ErrorResponse.badRequest('OTP has expired'), HttpStatus.BAD_REQUEST);
+    }
+
+    // Trường hợp bị block
+    if (record.blockedUntil && record.blockedUntil > new Date()) {
+      const waitSecond = Math.ceil((new Date(record.blockedUntil).getTime() - Date.now()) / 1000);
+      throw new HttpException(
+        ErrorResponse.badRequest(`You must wait ${waitSecond} seconds before submit a new OTP`),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Trường hợp đã hết thời gian chờ
+    if (record.blockedUntil && record.blockedUntil.getTime() < Date.now()) {
+      record.blockedUntil = undefined;
+      record.attempts = 0;
+      await record.save();
+    }
+
+    const blockMs = this.blockMs;
+    if (record.attempts >= this.maxAttempts) {
+      record.blockedUntil = new Date(Date.now() + blockMs);
+
+      await record.save();
+      throw new HttpException(ErrorResponse.badRequest('OTP too many attempts'), HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const checkOtp = await comparePassword(otp, record.otpHash);
+    if (!checkOtp) {
+      await this.otpModel.updateOne({ _id: record._id }, { $inc: { attempts: 1 } });
+      throw new HttpException(ErrorResponse.badRequest('OTP invalid'), HttpStatus.BAD_REQUEST);
+    }
+
+    await this.otpModel.deleteOne({ _id: record._id });
+    return ApiResponse.success(null, 'Verify OTP successfully', 200);
   }
 }

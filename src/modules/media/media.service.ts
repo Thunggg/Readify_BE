@@ -1,11 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CloudinaryService } from './cloudinary/cloudinary.service';
-import { AttachMediaDto } from './dto/attach-media.dto';
-import { ListMyMediaDto } from './dto/list-my-media.dto';
+import { Media, MediaStatus, MediaType } from './schemas/media.schema';
 import { UploadMediaDto } from './dto/upload-media.dto';
-import { Media, MediaDocument, MediaStatus, MediaType } from './schemas/media.schema';
+import { ApiResponse } from 'src/shared/responses/api-response';
 
 @Injectable()
 export class MediaService {
@@ -45,14 +44,7 @@ export class MediaService {
       size: file.size,
     });
 
-    return {
-      _id: doc._id,
-      url: doc.url,
-      publicId: doc.publicId,
-      type: doc.type,
-      status: doc.status,
-      createdAt: doc.createdAt,
-    };
+    return ApiResponse.success(doc, 'Media uploaded successfully', HttpStatus.CREATED);
   }
 
   async remove(mediaId: string, userId?: string) {
@@ -68,7 +60,7 @@ export class MediaService {
     await this.cloudinaryService.destroy(media.publicId);
 
     await this.mediaModel.deleteOne({ _id: media._id });
-    return { success: true };
+    return ApiResponse.success(null, 'Media deleted successfully', HttpStatus.OK);
   }
 
   // Used by cron cleanup
@@ -94,6 +86,6 @@ export class MediaService {
       createdAt: { $lt: cutoff },
     });
 
-    return { deleted: res.deletedCount ?? 0 };
+    return ApiResponse.success(res.deletedCount ?? 0, 'Media deleted successfully', HttpStatus.OK);
   }
 }

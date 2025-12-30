@@ -16,16 +16,19 @@ export class EmailOtp {
 
   // TTL index will use this field
   @Prop({ type: Date, required: true })
-  expiresAt: Date;
+  expiresAt: Date; // Thời gian hết hạn
 
   @Prop({ type: Number, default: 0 })
-  attempts: number;
+  attempts: number; // Số lần thử
 
   @Prop({ type: Number, default: 0 })
-  resendCount: number;
+  resendCount: number; // Số lần gửi lại
 
   @Prop({ type: Date, required: true })
-  lastSentAt: Date;
+  lastSentAt: Date; // Thời gian gửi lại
+
+  @Prop({ type: Date })
+  blockedUntil?: Date; // Thời gian bị block
 }
 
 export const EmailOtpSchema = SchemaFactory.createForClass(EmailOtp);
