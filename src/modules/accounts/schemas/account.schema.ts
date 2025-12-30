@@ -28,7 +28,7 @@ export class Account {
   @Prop({ trim: true, unique: true, lowercase: true, required: true, index: true })
   email: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, select: false })
   password: string;
 
   @Prop({ trim: true })
