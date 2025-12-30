@@ -26,7 +26,7 @@ export class AuthService {
     const password = dto.password;
 
     // 1) find account by email
-    const account = await this.accountModel.findOne({ email });
+    const account = await this.accountModel.findOne({ email }).select('+password');
 
     if (!account) {
       throw new HttpException(ApiResponse.error('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
@@ -46,7 +46,7 @@ export class AuthService {
 
     // 4) generate access token and refresh token
     const accessToken = this.jwtUtil.signAccessToken(
-      { sub: account._id as unknown as ObjectId, email: account.email },
+      { sub: account._id as unknown as ObjectId, email: account.email, role: account.role },
       this.configService.get<string>('jwt.accessTokenSecret') as string,
       this.configService.get<number>('jwt.accessTokenExpiresIn') as number,
     );

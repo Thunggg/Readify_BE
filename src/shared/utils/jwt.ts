@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService, JwtSignOptions, JwtVerifyOptions } from '@nestjs/jwt';
 import { ObjectId } from 'mongoose';
 
-export type AccessTokenPayload = { sub: ObjectId; email: string };
+export type AccessTokenPayload = { sub: ObjectId; email: string; role: number };
 export type RefreshTokenPayload = { sub: ObjectId };
 export type VerifyEmailPayload = { sub: ObjectId; email: string; purpose: 'verify_email' };
 
