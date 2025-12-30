@@ -3,8 +3,15 @@
 
 const bcrypt = require('bcrypt');
 const { MongoClient } = require('mongodb');
+require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://tptai1314_db_user:J8OBdXqjDh2nSTzU@Readify.dyrbkjw.mongodb.net/Readify?retryWrites=true&w=majority&tls=true';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI is required. Please set it in your .env file.');
+  process.exit(1);
+}
+
 const SALT_ROUNDS = 10;
 
 async function hashExistingPasswords() {
