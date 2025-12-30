@@ -12,6 +12,8 @@ import { SupplierModule } from './modules/supplier/supplier.module';
 import { BookModule } from './modules/book/books.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
+import { PromotionLogModule } from './modules/promotion-log/promotion-log.module';
+import { OrderModule } from './modules/order/order.module';
 import { CartModule } from './modules/cart/cart.module';
 import { MediaModule } from './modules/media/media.module';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -35,6 +37,8 @@ import { OtpModule } from './modules/otp/otp.module';
     BookModule,
     AuthModule,
     PromotionModule,
+    PromotionLogModule,
+    OrderModule,
     CartModule,
     MediaModule,
     UploadsModule,
