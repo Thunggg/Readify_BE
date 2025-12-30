@@ -22,6 +22,7 @@ import { UpdateAccountDto } from './dto/edit-account.dto';
 import { SearchAccountDto } from './dto/search-account.dto';
 import { ForgotPasswordRequestDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('accounts')
 export class AccountsController {
@@ -36,6 +37,12 @@ export class AccountsController {
   @UseGuards(JwtAuthGuard)
   getMe(@Req() req: any) {
     return this.accountsService.me(req?.user?.userId as string);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateMe(@Req() req: any, @Body() dto: UpdateProfileDto) {
+    return this.accountsService.updateProfile(req?.user?.userId as string, dto);
   }
 
   @Post('upload')

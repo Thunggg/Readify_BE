@@ -15,6 +15,7 @@ import { ForgotPasswordRequestDto } from './dto/forgot-password.dto';
 import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AccountsService {
@@ -68,6 +69,44 @@ export class AccountsService {
     }
 
     return ApiResponse.success(account, 'Account fetched successfully', 200);
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new HttpException(
+        ApiResponse.error('Invalid account id', 'INVALID_ACCOUNT_ID', HttpStatus.BAD_REQUEST),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const account = await this.accountModel.findById(userId);
+
+    if (!account || account.isDeleted === true) {
+      throw new HttpException(
+        ApiResponse.error('Account not found', 'ACCOUNT_NOT_FOUND', HttpStatus.NOT_FOUND),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (account.status === AccountStatus.BANNED) {
+      throw new HttpException(
+        ApiResponse.error('Account is banned', 'ACCOUNT_BANNED', HttpStatus.FORBIDDEN),
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    if (dto.firstName !== undefined) account.firstName = dto.firstName.trim();
+    if (dto.lastName !== undefined) account.lastName = dto.lastName.trim();
+    if (dto.dateOfBirth !== undefined) account.dateOfBirth = dto.dateOfBirth;
+    if (dto.phone !== undefined) account.phone = dto.phone;
+    if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
+    if (dto.address !== undefined) account.address = dto.address;
+    if (dto.sex !== undefined) account.sex = dto.sex;
+
+    const saved = await account.save();
+    const { password, ...accountData } = saved.toObject();
+
+    return ApiResponse.success(accountData, 'Profile updated successfully', 200);
   }
 
   async uploadFile(file: Express.Multer.File) {
