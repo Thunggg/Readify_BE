@@ -1,9 +1,8 @@
-import { HttpException, Injectable } from '@nestjs/common';
-import { Model, Types } from 'mongoose';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Model, Types, type QueryFilter } from 'mongoose';
 import { Account, AccountDocument } from './schemas/account.schema';
 import { RegisterAccountDto } from './dto/register-account.dto';
 import { ApiResponse } from 'src/shared/responses/api-response';
-import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ErrorResponse } from 'src/shared/responses/error.response';
@@ -11,8 +10,11 @@ import { hashPassword } from 'src/shared/utils/bcrypt';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { AccountRole, AccountStatus, SortOrder, StaffSortBy } from '../staff/constants/staff.enum';
 import { UpdateAccountDto } from './dto/edit-account.dto';
-import { SearchStaffDto } from '../staff/dto/search-staff.dto';
 import { SearchAccountDto } from './dto/search-account.dto';
+import { ForgotPasswordRequestDto } from './dto/forgot-password.dto';
+import { OtpService } from '../otp/otp.service';
+import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AccountsService {
@@ -20,6 +22,7 @@ export class AccountsService {
     @InjectModel(Account.name)
     private readonly accountModel: Model<AccountDocument>,
     private readonly configService: ConfigService,
+    private readonly otpService: OtpService,
   ) {}
 
   async register(dto: RegisterAccountDto) {
@@ -201,7 +204,7 @@ export class AccountsService {
     const skip = (validPage - 1) * validLimit;
 
     // FILTER
-    const filter: any = {
+    const filter: QueryFilter<AccountDocument> = {
       role: {
         $in: [AccountRole.USER],
         $ne: AccountRole.ADMIN,
@@ -229,7 +232,7 @@ export class AccountsService {
     }
 
     // SORT
-    const sortMap: Record<string, any> = {
+    const sortMap: Record<string, Record<string, 1 | -1>> = {
       createdAt: { createdAt: order === 'asc' ? 1 : -1 },
       email: { email: order === 'asc' ? 1 : -1 },
       firstName: {
@@ -243,14 +246,20 @@ export class AccountsService {
       lastLoginAt: { lastLoginAt: order === 'asc' ? 1 : -1 },
     };
 
-    const sort = {
+    const sort: Record<string, 1 | -1> = {
       ...(sortMap[sortBy] ?? { createdAt: -1 }),
       _id: 1,
     };
 
     // QUERY
     const [items, total] = await Promise.all([
-      this.accountModel.find(filter).sort(sort).skip(skip).limit(validLimit).select({ password: 0 }).lean(),
+      this.accountModel
+        .find(filter)
+        .sort(sort as Parameters<ReturnType<Model<AccountDocument>['find']>['sort']>[0])
+        .skip(skip)
+        .limit(validLimit)
+        .select({ password: 0 })
+        .lean(),
       this.accountModel.countDocuments(filter),
     ]);
 
@@ -263,5 +272,73 @@ export class AccountsService {
       },
       'Account list retrieved successfully',
     );
+  }
+
+  async forgotPassword(dto: ForgotPasswordRequestDto) {
+    const email = dto.email.trim().toLowerCase();
+
+    const account = await this.accountModel.findOne({ email });
+
+    if (!account) {
+      throw new HttpException(
+        ApiResponse.error('If the email exists, an OTP has been sent', 'ACCOUNT_NOT_FOUND', HttpStatus.NOT_FOUND),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (account?.status !== AccountStatus.ACTIVE || account?.isDeleted === true) {
+      throw new HttpException(
+        ApiResponse.error('Account is delete or banned', 'ACCOUNT_IS_DELETED_OR_BANNED', HttpStatus.BAD_REQUEST),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      await this.otpService.sendOtp({ email, purpose: OtpPurpose.FORGOT_PASSWORD });
+    } catch (err) {
+      // Nếu OTP đã được gửi (hoặc bất kỳ lỗi OTP nào khác), giữ nguyên phản hồi không tiết lộ
+      return ApiResponse.success(null, 'If the email exists, an OTP has been sent', 200);
+    }
+
+    return ApiResponse.success(null, 'If the email exists, an OTP has been sent', 200);
+  }
+
+  async resendForgotPasswordOtp(dto: ForgotPasswordRequestDto) {
+    const email = dto.email.trim().toLowerCase();
+
+    try {
+      await this.otpService.reSendOtp({ email, purpose: OtpPurpose.FORGOT_PASSWORD });
+    } catch (err) {
+      // không làm gì cả và trả về phản hồi thành công
+    }
+
+    return ApiResponse.success(null, 'If the email exists, an OTP has been sent', 200);
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new HttpException(
+        ErrorResponse.badRequest('New password and confirm password do not match'),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.otpService.verifyOtp({ email, otp: dto.otp, purpose: OtpPurpose.FORGOT_PASSWORD });
+
+    const account = await this.accountModel.findOne({ email });
+    if (!account) {
+      throw new HttpException(
+        ApiResponse.error('Account not found', 'ACCOUNT_NOT_FOUND', HttpStatus.NOT_FOUND),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    account.password = await hashPassword(dto.newPassword, Number(this.configService.get<number>('bcrypt.saltRounds')));
+    await account.save();
+
+    const { password, ...accountData } = account.toObject();
+    return ApiResponse.success(accountData, 'Password reset successfully', 200);
   }
 }

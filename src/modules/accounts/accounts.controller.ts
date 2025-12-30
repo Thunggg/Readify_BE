@@ -20,6 +20,8 @@ import { CreateAccountDto } from './dto/create-account.dto';
 import { AccountIdDto } from './dto/account-id.dto';
 import { UpdateAccountDto } from './dto/edit-account.dto';
 import { SearchAccountDto } from './dto/search-account.dto';
+import { ForgotPasswordRequestDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('accounts')
 export class AccountsController {
@@ -65,5 +67,20 @@ export class AccountsController {
   @Delete('delete/:id')
   deleteAccount(@Param() params: AccountIdDto) {
     return this.accountsService.deleteAccount(params.id);
+  }
+
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordRequestDto) {
+    return this.accountsService.forgotPassword(dto);
+  }
+
+  @Post('forgot-password/re-send')
+  resendForgotPasswordOtp(@Body() dto: ForgotPasswordRequestDto) {
+    return this.accountsService.resendForgotPasswordOtp(dto);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.accountsService.resetPassword(dto);
   }
 }

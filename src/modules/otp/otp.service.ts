@@ -170,13 +170,6 @@ export class OtpService {
 
     const html = this.buildOtpHtml({ displayDate, name, otp, expiresInMinutes });
 
-    await this.mail.sendEmail({
-      to: email,
-      subject: 'OTP Verification',
-      text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
-      html,
-    });
-
     // Upsert to avoid duplicate key errors on (email, purpose)
     await this.otpModel.updateOne(
       { email, purpose },
@@ -194,6 +187,19 @@ export class OtpService {
       },
       { upsert: true },
     );
+
+    try {
+      await this.mail.sendEmail({
+        to: email,
+        subject: 'OTP Verification',
+        text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+        html,
+      });
+    } catch (err) {
+      // roll back tránh lưu OTP không gửi được
+      await this.otpModel.deleteOne({ email, purpose });
+      throw new HttpException(ErrorResponse.internal('Failed to send OTP email'), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
     return ApiResponse.success(null, 'OTP sent successfully', 200);
   }
@@ -258,17 +264,42 @@ export class OtpService {
 
     const html = this.buildOtpHtml({ displayDate, name, otp, expiresInMinutes });
 
-    await this.mail.sendEmail({
-      to: email,
-      subject: 'OTP Verification',
-      text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
-      html,
-    });
+    // Update DB first to ensure OTP in email matches what we verify against.
+    // If email sending fails, revert to the previous OTP fields.
+    const prev = {
+      otpHash: record.otpHash,
+      expiresAt: record.expiresAt,
+      lastSentAt: record.lastSentAt,
+      resendCount: record.resendCount,
+    };
 
     await this.otpModel.updateOne(
       { _id: record._id },
-      { $set: { otpHash, expiresAt, lastSentAt: new Date() }, $inc: { resendCount: 1 } },
+      { $set: { otpHash, expiresAt, lastSentAt: now }, $inc: { resendCount: 1 } },
     );
+
+    try {
+      await this.mail.sendEmail({
+        to: email,
+        subject: 'OTP Verification',
+        text: `Your OTP is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+        html,
+      });
+    } catch (err) {
+      // rollback lại OTP cũ để tránh lưu OTP không gửi được
+      await this.otpModel.updateOne(
+        { _id: record._id },
+        {
+          $set: {
+            otpHash: prev.otpHash,
+            expiresAt: prev.expiresAt,
+            lastSentAt: prev.lastSentAt,
+            resendCount: prev.resendCount,
+          },
+        },
+      );
+      throw new HttpException(ErrorResponse.internal('Failed to send OTP email'), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
     return ApiResponse.success(null, 'OTP resent successfully', 200);
   }
