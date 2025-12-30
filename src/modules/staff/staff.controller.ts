@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { StaffService } from './staff.service';
 import { SearchStaffDto } from './dto/search-staff.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -6,12 +6,19 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { UpdateStaffStatusDto } from './dto/update-staff-status.dto';
 import { UpdateStaffRoleDto } from './dto/update-staff-role.dto';
 import { StaffIdDto } from './dto/staff-id.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { AccountRole } from './constants/staff.enum';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(AccountRole.ADMIN)
 @Controller('staff')
 export class StaffController {
   constructor(private readonly staffService: StaffService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   getList(@Query() query: SearchStaffDto) {
     return this.staffService.getStaffList(query);
   }

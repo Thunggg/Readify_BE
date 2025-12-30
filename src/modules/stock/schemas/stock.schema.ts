@@ -1,48 +1,30 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
-import { plainToInstance } from 'class-transformer';
-import { IsDateString, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
+export type StockDocument = HydratedDocument<Stock>;
 
-export class StockSchema {
-	@IsOptional()
-	@IsString()
-	_id?: string;
+@Schema({ timestamps: true })
+export class Stock {
+  @Prop({ type: Types.ObjectId, ref: 'Book', required: true, index: true })
+  bookId: Types.ObjectId;
 
-	@IsString()
-	bookId: string; // reference to books._id (string)
+  @Prop({ default: 0 })
+  quantity: number;
 
-	@IsOptional()
-	@IsNumber()
-	quantity?: number;
+  @Prop()
+  location?: string;
 
-	@IsOptional()
-	@IsString()
-	location?: string;
+  @Prop()
+  price?: number;
 
-	@IsOptional()
-	@IsNumber()
-	price?: number;
+  @Prop()
+  batch?: string;
 
-	@IsOptional()
-	@IsString()
-	batch?: string;
+  @Prop()
+  lastUpdated?: Date;
 
-	@IsOptional()
-	@IsDateString()
-	lastUpdated?: string;
-
-	@IsOptional()
-	@IsString()
-	status?: string;
+  @Prop({ default: 'available' })
+  status?: string;
 }
 
-export function validateStock(obj: unknown): { valid: boolean; errors?: any[]; value?: StockSchema } {
-	const inst = plainToInstance(StockSchema, obj);
-	const errors = validateSync(inst, { whitelist: true, forbidNonWhitelisted: false });
-	if (errors.length > 0) {
-		const mapped = errors.map((e) => ({ property: e.property, constraints: e.constraints }));
-		return { valid: false, errors: mapped };
-	}
-	return { valid: true, value: inst };
-}
-
-export type StockDocument = Omit<StockSchema, '_id'> & { _id?: string };
+export const StockSchema = SchemaFactory.createForClass(Stock);
