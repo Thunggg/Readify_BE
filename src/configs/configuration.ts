@@ -40,4 +40,13 @@ export default () => ({
     user: process.env.MAIL_USER ?? '',
     pass: process.env.MAIL_PASS ?? '',
   },
+
+  // OTP
+  otp: {
+    expiresInMinutes: Number(process.env.OTP_EXPIRES_IN_MINUTES ?? 5),
+    cooldownMs: Number(process.env.OTP_COOLDOWN_MS ?? 60_000),
+    blockMs: Number(process.env.OTP_BLOCK_MS ?? 15 * 60_000),
+    maxResendCount: Number(process.env.OTP_MAX_RESEND_COUNT ?? 10),
+    maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS ?? 10),
+  },
 });
