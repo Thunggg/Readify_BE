@@ -21,4 +21,7 @@ export const validateEnv = Joi.object({
   OTP_BLOCK_MS: Joi.number().integer().positive().optional(),
   OTP_MAX_RESEND_COUNT: Joi.number().integer().positive().optional(),
   OTP_MAX_ATTEMPTS: Joi.number().integer().positive().optional(),
+
+  // Pending Registration
+  PENDING_REGISTRATION_EXPIRES_IN_MINUTES: Joi.number().integer().positive().optional(),
 });
