@@ -51,12 +51,24 @@ export class AccountsService {
       this.configService.get<number>('bcrypt.saltRounds') as number,
     );
 
+    const firstName = dto.firstName?.trim();
+    const lastName = dto.lastName?.trim();
+    const phone = dto.phone?.trim();
+    const address = dto.address?.trim();
+    const dateOfBirth =
+      typeof dto.dateOfBirth === 'string' && dto.dateOfBirth.length > 0 ? new Date(dto.dateOfBirth) : undefined;
+
     const newAccount = new this.accountModel({
+      firstName,
+      lastName,
+      phone,
+      address,
+      dateOfBirth,
       email,
       password: passwordHash,
       status: 2,
       role: 0,
-      sex: 0,
+      sex: dto.sex ?? 0,
     });
 
     const savedAccount = await newAccount.save();
