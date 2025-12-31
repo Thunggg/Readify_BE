@@ -8,10 +8,12 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { RegisterAccountDto } from './dto/register-account.dto';
 import { AccountsService } from './accounts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,14 +27,40 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { VerifyRegisterDto } from './dto/verify-otp.dto';
 
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterAccountDto) {
-    return this.accountsService.register(dto);
+  async register(@Body() dto: RegisterAccountDto, @Res({ passthrough: true }) res: Response) {
+    const response = await this.accountsService.register(dto);
+
+    const email = dto.email.trim().toLowerCase();
+    res.cookie('regEmail', email, {
+      httpOnly: true,
+      sameSite: 'lax', // dev OK
+      secure: false, // true khi HTTPS
+      maxAge: 15 * 60 * 1000, // 15 phút
+      path: '/',
+    });
+
+    return response;
+  }
+
+  @Post('register/resend-otp')
+  resendRegisterOtp(@Req() req: any) {
+    return this.accountsService.resendRegisterOtp(req?.cookies?.regEmail as string);
+  }
+
+  @Post('register/verify')
+  async verifyRegister(@Body() dto: VerifyRegisterDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const email = req?.cookies?.regEmail as string;
+    const response = await this.accountsService.verifyRegister(email, dto.otp);
+
+    res.clearCookie('regEmail', { path: '/' });
+    return response;
   }
 
   @Get('me')

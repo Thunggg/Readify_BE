@@ -161,7 +161,7 @@ export class OtpService {
     const otp = this.makeOtp();
     const otpHash = await hashPassword(otp, this.configService.get<number>('bcrypt.saltRounds') as number);
     const expiresInMinutes = this.expiresInMinutes;
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000); // 5 phút
 
     const now = new Date();
     const displayDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
