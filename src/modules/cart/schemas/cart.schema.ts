@@ -14,6 +14,9 @@ export class Cart {
   @Prop({ required: true, min: 1, default: 1 })
   quantity: number;
 
+  @Prop({ default: false })
+  isSelected: boolean;
+
   @Prop()
   createdAt?: Date;
 

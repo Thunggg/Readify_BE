@@ -5,6 +5,7 @@ import { Cart, CartDocument } from './schemas/cart.schema';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { Stock, StockDocument } from '../stock/schemas/stock.schema';
+import { Book, BookDocument } from '../book/schemas/book.schema';
 import { ApiResponse } from '../../shared/responses/api-response';
 import { ErrorResponse } from '../../shared/responses/error.response';
 
@@ -13,6 +14,7 @@ export class CartService {
   constructor(
     @InjectModel(Cart.name) private cartModel: Model<CartDocument>,
     @InjectModel(Stock.name) private stockModel: Model<StockDocument>,
+    @InjectModel(Book.name) private bookModel: Model<BookDocument>,
   ) {}
 
   async addToCart(userId: string, addToCartDto: AddToCartDto) {
@@ -21,6 +23,12 @@ export class CartService {
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(bookId)) {
       throw new BadRequestException('Invalid userId or bookId');
+    }
+
+    // Check if book exists in database
+    const book = await this.bookModel.findById(bookId);
+    if (!book) {
+      throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check stock availability
@@ -70,10 +78,7 @@ export class CartService {
       return ApiResponse.success(created, 'Item added to cart successfully');
     } catch (error) {
       if (error.code === 11000) {
-        throw new HttpException(
-          ErrorResponse.badRequest('Book already exists in cart'),
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException(ErrorResponse.badRequest('Book already exists in cart'), HttpStatus.BAD_REQUEST);
       }
       throw error;
     }
@@ -176,5 +181,117 @@ export class CartService {
     });
 
     return ApiResponse.success({ count }, 'Cart count retrieved successfully');
+  }
+
+  async getCartItem(userId: string, bookId: string) {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(bookId)) {
+      throw new BadRequestException('Invalid userId or bookId');
+    }
+
+    const cartItem = await this.cartModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        bookId: new Types.ObjectId(bookId),
+      })
+      .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
+      .lean()
+      .exec();
+
+    if (!cartItem) {
+      throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(cartItem, 'Cart item retrieved successfully');
+  }
+
+  async toggleSelectItem(userId: string, bookId: string) {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(bookId)) {
+      throw new BadRequestException('Invalid userId or bookId');
+    }
+
+    const cartItem = await this.cartModel.findOne({
+      userId: new Types.ObjectId(userId),
+      bookId: new Types.ObjectId(bookId),
+    });
+
+    if (!cartItem) {
+      throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
+    }
+
+    const updated = await this.cartModel.findOneAndUpdate(
+      {
+        userId: new Types.ObjectId(userId),
+        bookId: new Types.ObjectId(bookId),
+      },
+      { isSelected: !cartItem.isSelected },
+      { new: true },
+    );
+
+    return ApiResponse.success(updated, 'Cart item selection toggled successfully');
+  }
+
+  async updateItemSelection(userId: string, bookId: string, isSelected: boolean) {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(bookId)) {
+      throw new BadRequestException('Invalid userId or bookId');
+    }
+
+    const cartItem = await this.cartModel.findOneAndUpdate(
+      {
+        userId: new Types.ObjectId(userId),
+        bookId: new Types.ObjectId(bookId),
+      },
+      { isSelected },
+      { new: true },
+    );
+
+    if (!cartItem) {
+      throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(cartItem, 'Cart item selection updated successfully');
+  }
+
+  async selectAllItems(userId: string) {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
+    }
+
+    await this.cartModel.updateMany({ userId: new Types.ObjectId(userId) }, { isSelected: true });
+
+    return ApiResponse.success(null, 'All cart items selected successfully');
+  }
+
+  async deselectAllItems(userId: string) {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
+    }
+
+    await this.cartModel.updateMany({ userId: new Types.ObjectId(userId) }, { isSelected: false });
+
+    return ApiResponse.success(null, 'All cart items deselected successfully');
+  }
+
+  async getSelectedItems(userId: string) {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
+    }
+
+    const selectedItems = await this.cartModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        isSelected: true as any,
+      })
+      .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    return ApiResponse.success(selectedItems, 'Selected cart items retrieved successfully');
   }
 }
