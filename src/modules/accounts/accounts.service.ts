@@ -87,26 +87,10 @@ export class AccountsService {
     return ApiResponse.success(null, 'OTP sent successfully. Please verify to complete registration.', 200);
   }
 
-  async resendRegisterOtp(regEmail: string) {
-    const email = (regEmail ?? '').trim().toLowerCase();
-    if (!email) {
-      throw new HttpException(ErrorResponse.badRequest('Missing registration email cookie'), HttpStatus.BAD_REQUEST);
-    }
-
-    const pending = await this.pendingRegistrationModel.exists({ email });
-    if (!pending) {
-      throw new HttpException(ErrorResponse.notFound('Pending registration not found'), HttpStatus.NOT_FOUND);
-    }
-
-    await this.otpService.reSendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
-    return ApiResponse.success(null, 'OTP resent successfully', 200);
-  }
-
   async verifyRegister(regEmail: string, otp: string) {
-    // nếu email không tồn tại trong cookie thì throw lỗi
     const email = (regEmail ?? '').trim().toLowerCase();
     if (!email) {
-      throw new HttpException(ErrorResponse.badRequest('Missing registration email cookie'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(ErrorResponse.badRequest('Missing OTP email'), HttpStatus.BAD_REQUEST);
     }
 
     // nếu email đã tồn tại trong database thì throw lỗi
@@ -504,7 +488,7 @@ export class AccountsService {
   async verifyForgotPasswordOtp(regEmail: string, otp: string) {
     const email = (regEmail ?? '').trim().toLowerCase();
     if (!email) {
-      throw new HttpException(ErrorResponse.badRequest('Missing forgotPasswordEmail cookie'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(ErrorResponse.badRequest('Missing OTP email'), HttpStatus.BAD_REQUEST);
     }
 
     const account = await this.accountModel.findOne({ email });
