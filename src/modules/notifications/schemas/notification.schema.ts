@@ -45,3 +45,4 @@ NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
 NotificationSchema.index({ userId: 1, type: 1, createdAt: -1 });
 NotificationSchema.index({ isActive: 1, createdAt: -1 });
 
+
