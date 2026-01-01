@@ -35,5 +35,30 @@ export default () => ({
     returnUrl: process.env.VNPAY_RETURN_URL ?? 'http://localhost:3000/payment/vnpay/return',
     ipnUrl: process.env.VNPAY_IPN_URL ?? 'http://localhost:3000/payment/vnpay/ipn',
     url: process.env.VNPAY_URL ?? 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+  // Cloudinary
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',
+    apiKey: process.env.CLOUDINARY_API_KEY ?? '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET ?? '',
+  },
+
+  // Mail
+  mail: {
+    user: process.env.MAIL_USER ?? '',
+    pass: process.env.MAIL_PASS ?? '',
+  },
+
+  // OTP
+  otp: {
+    expiresInMinutes: Number(process.env.OTP_EXPIRES_IN_MINUTES ?? 5),
+    cooldownMs: Number(process.env.OTP_COOLDOWN_MS ?? 60_000),
+    blockMs: Number(process.env.OTP_BLOCK_MS ?? 15 * 60_000),
+    maxResendCount: Number(process.env.OTP_MAX_RESEND_COUNT ?? 10),
+    maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS ?? 10),
+  },
+
+  // Pending Registration
+  pendingRegistration: {
+    expiresInMinutes: Number(process.env.PENDING_REGISTRATION_EXPIRES_IN_MINUTES ?? 15),
   },
 });

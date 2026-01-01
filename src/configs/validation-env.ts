@@ -16,4 +16,19 @@ export const validateEnv = Joi.object({
   VNPAY_IPN_URL: Joi.string().uri().optional(),
   VNPAY_URL: Joi.string().uri().optional(),
   FRONTEND_URL: Joi.string().uri().optional(),
+  CLOUDINARY_CLOUD_NAME: Joi.string().required(),
+  CLOUDINARY_API_KEY: Joi.string().required(),
+  CLOUDINARY_API_SECRET: Joi.string().required(),
+  MAIL_USER: Joi.string().required(),
+  MAIL_PASS: Joi.string().required(),
+
+  // OTP (optional; defaults are applied in configuration.ts)
+  OTP_EXPIRES_IN_MINUTES: Joi.number().integer().positive().optional(),
+  OTP_COOLDOWN_MS: Joi.number().integer().positive().optional(),
+  OTP_BLOCK_MS: Joi.number().integer().positive().optional(),
+  OTP_MAX_RESEND_COUNT: Joi.number().integer().positive().optional(),
+  OTP_MAX_ATTEMPTS: Joi.number().integer().positive().optional(),
+
+  // Pending Registration
+  PENDING_REGISTRATION_EXPIRES_IN_MINUTES: Joi.number().integer().positive().optional(),
 });

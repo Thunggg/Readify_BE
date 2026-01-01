@@ -32,8 +32,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid token');
     }
 
-    // 2. Ép payload thành object có sub và email
-    const data = payload as { sub?: string; email?: string };
+    // 2. Ép payload thành object có sub/email/role
+    const data = payload as { sub?: string; email?: string; role?: number };
 
     // 3. Nếu không có sub (userId) → token không hợp lệ
     if (!data.sub) {
@@ -44,6 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     return {
       userId: data.sub,
       email: data.email,
+      role: data.role,
     };
   }
 }
