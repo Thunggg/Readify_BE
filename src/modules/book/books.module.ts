@@ -8,6 +8,7 @@ import { BooksPublicService } from './services/books.public.service';
 import { Stock, StockSchema } from '../stock/schemas/stock.schema';
 import { Media, MediaSchema } from '../media/schemas/media.schema';
 import { Category, CategorySchema } from '../categories/schemas/category.schema';
+import { Supplier, SupplierSchema } from '../supplier/schemas/supplier.schema';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Category, CategorySchema } from '../categories/schemas/category.schema'
       { name: Stock.name, schema: StockSchema },
       { name: Media.name, schema: MediaSchema },
       { name: Category.name, schema: CategorySchema },
+      { name: Supplier.name, schema: SupplierSchema },
     ]),
   ],
   controllers: [BooksAdminController, BooksPublicController],

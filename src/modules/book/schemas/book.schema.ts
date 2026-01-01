@@ -48,9 +48,6 @@ export class Book {
   @Prop({ required: true, min: 0 })
   basePrice: number;
 
-  @Prop({ min: 0 })
-  originalPrice?: number;
-
   // Optional: currency if you care later
   @Prop({ default: 'VND' })
   currency: string;
@@ -84,22 +81,9 @@ export class Book {
   @Prop({ default: 0, index: true })
   soldCount: number;
 
-  // Ratings summary (if you have ReviewsModule later)
-  // @Prop({ default: 0 })
-  // ratingAvg: number;
-
-  // @Prop({ default: 0 })
-  // ratingCount: number;
-
   // Tags for quick filtering/search
   @Prop({ type: [String], default: [], index: true })
   tags: string[];
-
-  @Prop({ default: 0 })
-  stockOnHand?: number;
-
-  @Prop({ default: 0 })
-  stockReserved?: number;
 }
 
 export const BookSchema = SchemaFactory.createForClass(Book);

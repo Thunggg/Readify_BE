@@ -10,10 +10,7 @@ import { ErrorResponse } from '../../../shared/responses/error.response';
 import { Stock } from 'src/modules/stock/schemas/stock.schema';
 import { Media, MediaStatus } from 'src/modules/media/schemas/media.schema';
 import { Category } from 'src/modules/categories/schemas/category.schema';
-
-function escapeRegex(input: string) {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import { Supplier } from 'src/modules/supplier/schemas/supplier.schema';
 
 @Injectable()
 export class BooksAdminService {
@@ -22,6 +19,8 @@ export class BooksAdminService {
     @InjectModel(Book.name) private readonly bookModel: Model<BookDocument>,
     @InjectModel(Stock.name) private readonly stockModel: Model<Stock>,
     @InjectModel(Media.name) private readonly mediaModel: Model<Media>,
+    @InjectModel(Category.name) private readonly categoryModel: Model<Category>,
+    @InjectModel(Supplier.name) private readonly supplierModel: Model<Supplier>,
   ) {}
 
   // View books list for dashboard
@@ -72,7 +71,7 @@ export class BooksAdminService {
     }
 
     if (q?.trim()) {
-      const kw = escapeRegex(q.trim());
+      const kw = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
         { title: { $regex: kw, $options: 'i' } },
         { subtitle: { $regex: kw, $options: 'i' } },
@@ -107,15 +106,12 @@ export class BooksAdminService {
           slug: 1,
           thumbnailUrl: 1,
           basePrice: 1,
-          originalPrice: 1,
           currency: 1,
           publisherId: 1,
           categoryIds: 1,
           status: 1,
           isDeleted: 1,
           soldCount: 1,
-          stockOnHand: 1,
-          stockReserved: 1,
           createdAt: 1,
           updatedAt: 1,
         })
@@ -148,22 +144,18 @@ export class BooksAdminService {
         description: 1,
         authors: 1,
         language: 1,
-        format: 1,
         publishDate: 1,
         pageCount: 1,
         isbn: 1,
         publisherId: 1,
         categoryIds: 1,
         basePrice: 1,
-        originalPrice: 1,
         currency: 1,
         images: 1,
         thumbnailUrl: 1,
         status: 1,
         soldCount: 1,
         tags: 1,
-        stockOnHand: 1,
-        stockReserved: 1,
         createdAt: 1,
         updatedAt: 1,
       })
@@ -174,6 +166,49 @@ export class BooksAdminService {
     }
 
     return ApiResponse.success(book, 'Successfully retrieved the book by slug');
+  }
+
+  async getDeletedBookBySlug(slug: string) {
+    if (!slug?.trim()) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'slug', message: 'Slug is required' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const book = await this.bookModel
+      .findOne({ slug: slug.toLowerCase().trim(), isDeleted: true })
+      .select({
+        title: 1,
+        slug: 1,
+        subtitle: 1,
+        description: 1,
+        authors: 1,
+        language: 1,
+        publishDate: 1,
+        pageCount: 1,
+        isbn: 1,
+        publisherId: 1,
+        categoryIds: 1,
+        basePrice: 1,
+        currency: 1,
+        images: 1,
+        thumbnailUrl: 1,
+        status: 1,
+        soldCount: 1,
+        tags: 1,
+        isDeleted: 1,
+        deletedAt: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .lean();
+
+    if (!book) {
+      throw new HttpException(ErrorResponse.notFound('Deleted book not found'), HttpStatus.NOT_FOUND);
+    }
+
+    return ApiResponse.success(book, 'Successfully retrieved the deleted book by slug');
   }
 
   // View book detail for dashboard
@@ -194,14 +229,12 @@ export class BooksAdminService {
         description: 1,
         authors: 1,
         language: 1,
-        format: 1,
         publishDate: 1,
         pageCount: 1,
         isbn: 1,
         publisherId: 1,
         categoryIds: 1,
         basePrice: 1,
-        originalPrice: 1,
         currency: 1,
         images: 1,
         thumbnailUrl: 1,
@@ -210,8 +243,6 @@ export class BooksAdminService {
         deletedAt: 1,
         soldCount: 1,
         tags: 1,
-        stockOnHand: 1,
-        stockReserved: 1,
         createdAt: 1,
         updatedAt: 1,
       })
@@ -282,9 +313,38 @@ export class BooksAdminService {
       );
     }
 
+    // Validate publisher (supplier) exists and is not deleted
+    const publisher = await this.supplierModel
+      .findById(dto.publisherId)
+      .select({ _id: 1, isDeleted: 1 })
+      .lean();
+
+    if (!publisher) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher not found' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (publisher.isDeleted === true) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher is deleted' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (dto.basePrice === undefined || dto.basePrice === null) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'basePrice', message: 'basePrice is required' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check for duplicate categoryIds
+    const uniqueCategoryIds = [...new Set(dto.categoryIds)];
+    if (uniqueCategoryIds.length !== dto.categoryIds.length) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'categoryIds', message: 'Duplicate categoryIds detected' }]),
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -298,6 +358,27 @@ export class BooksAdminService {
       }
       return new Types.ObjectId(id);
     });
+
+    // Validate categories exist and are not deleted
+    const categories = await this.categoryModel
+      .find({ _id: { $in: categoryIds } })
+      .select({ _id: 1, isDeleted: 1 })
+      .lean();
+
+    if (categories.length !== categoryIds.length) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories not found' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const deletedCategory = categories.find((c) => c.isDeleted === true);
+    if (deletedCategory) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories are deleted' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     if (!dto.coverMediaId || !Types.ObjectId.isValid(dto.coverMediaId)) {
       throw new HttpException(
@@ -332,21 +413,12 @@ export class BooksAdminService {
           .session(session)
           .lean();
 
-        // if (medias.length !== allMediaIds.length) {
-        //   throw new HttpException(
-        //     ErrorResponse.validationError([{ field: 'mediaIds', message: 'One or more media not found' }]),
-        //     HttpStatus.BAD_REQUEST,
-        //   );
-        // }
-
-        // // optional: ensure medias are TEMP (not already attached)
-        // const invalid = medias.find((m) => String(m.status) !== 'TEMP');
-        // if (invalid) {
-        //   throw new HttpException(
-        //     ErrorResponse.validationError([{ field: 'mediaIds', message: 'One or more media is not TEMP' }]),
-        //     HttpStatus.BAD_REQUEST,
-        //   );
-        // }
+        if (medias.length !== allMediaIds.length) {
+          throw new HttpException(
+            ErrorResponse.validationError([{ field: 'mediaIds', message: 'One or more media not found' }]),
+            HttpStatus.BAD_REQUEST,
+          );
+        }
 
         const cover = medias.find((m) => String(m._id) === dto.coverMediaId);
         if (!cover) {
@@ -379,15 +451,12 @@ export class BooksAdminService {
             })),
           ],
           basePrice: dto.basePrice,
-          originalPrice: dto.originalPrice,
           currency: dto.currency?.trim() || 'VND',
           thumbnailUrl: cover.url,
           status: dto.status ?? 1,
           tags: dto.tags ?? [],
           isDeleted: false,
           soldCount: 0,
-          stockOnHand: 0,
-          stockReserved: 0,
         } satisfies Partial<Book>;
 
         const book = await new this.bookModel(bookPayload).save({ session });
@@ -409,7 +478,7 @@ export class BooksAdminService {
           {
             $set: {
               status: 'ATTACHED',
-              attachedTo: { model: 'Book', id: book._id },
+              // attachedTo: { model: 'Book', id: book._id },
             },
           },
           { session },
@@ -465,7 +534,6 @@ export class BooksAdminService {
         if (dto.publishDate !== undefined) book.publishDate = dto.publishDate;
         if (dto.pageCount !== undefined) book.pageCount = dto.pageCount;
         if (dto.basePrice !== undefined) book.basePrice = dto.basePrice;
-        if (dto.originalPrice !== undefined) book.originalPrice = dto.originalPrice;
         if (dto.currency !== undefined) book.currency = dto.currency?.trim() || 'VND';
         if (dto.status !== undefined) book.status = dto.status;
         if (dto.tags !== undefined) book.tags = dto.tags;
@@ -502,6 +570,92 @@ export class BooksAdminService {
             }
             book.slug = slug;
           }
+        }
+
+        // ===== 3.1) Validate categoryIds if provided =====
+        if (dto.categoryIds !== undefined) {
+          if (!dto.categoryIds?.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'categoryIds cannot be empty' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // Check for duplicate categoryIds
+          const uniqueCategoryIds = [...new Set(dto.categoryIds)];
+          if (uniqueCategoryIds.length !== dto.categoryIds.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'Duplicate categoryIds detected' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          const categoryIds = dto.categoryIds.map((id) => {
+            if (!Types.ObjectId.isValid(id)) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'categoryIds', message: `Invalid categoryId: ${id}` }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+            return new Types.ObjectId(id);
+          });
+
+          // Validate categories exist and are not deleted
+          const categories = await this.categoryModel
+            .find({ _id: { $in: categoryIds } })
+            .select({ _id: 1, isDeleted: 1 })
+            .session(session)
+            .lean();
+
+          if (categories.length !== categoryIds.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories not found' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          const deletedCategory = categories.find((c) => c.isDeleted === true);
+          if (deletedCategory) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories are deleted' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          book.categoryIds = categoryIds;
+        }
+
+        // ===== 3.2) Validate publisherId if provided =====
+        if (dto.publisherId !== undefined) {
+          if (!Types.ObjectId.isValid(dto.publisherId)) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publisherId', message: 'Invalid publisherId' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // Validate publisher (supplier) exists and is not deleted
+          const publisher = await this.supplierModel
+            .findById(dto.publisherId)
+            .select({ _id: 1, isDeleted: 1 })
+            .session(session)
+            .lean();
+
+          if (!publisher) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher not found' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          if (publisher.isDeleted === true) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher is deleted' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          book.publisherId = new Types.ObjectId(dto.publisherId);
         }
 
         // ===== 4) MEDIA =====
@@ -628,7 +782,7 @@ export class BooksAdminService {
     }
   }
 
-  async deleteBook(id: string, staffId?: string) {
+  async deleteBook(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
@@ -644,28 +798,22 @@ export class BooksAdminService {
         if (!book) {
           throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
         }
-        // if (book.isDeleted) {
-        //   throw new HttpException(
-        //     ErrorResponse.validationError([{ field: 'id', message: 'Book already deleted' }]),
-        //     HttpStatus.BAD_REQUEST,
-        //   );
-        // }
 
-        //  Rule: không cho delete nếu còn hàng hoặc đang reserved
-        // if ((book.stockOnHand ?? 0) > 0 || (book.stockReserved ?? 0) > 0) {
-        //   throw new HttpException(
-        //     ErrorResponse.validationError([{ field: 'id', message: 'Cannot delete book with remaining stock' }]),
-        //     HttpStatus.BAD_REQUEST,
-        //   );
-        // }
-
-        // 2) Soft delete Book
-        book.isDeleted = true;
-        (book as any).deletedAt = new Date();
-        if (staffId && Types.ObjectId.isValid(staffId)) {
-          (book as any).deletedBy = new Types.ObjectId(staffId);
+        if (book.isDeleted) {
+          throw new HttpException(
+            ErrorResponse.validationError([{ field: 'id', message: 'Book already deleted' }]),
+            HttpStatus.BAD_REQUEST,
+          );
         }
-        await book.save({ session });
+
+        // Soft delete Book
+        const updateData: any = {
+          isDeleted: true,
+          deletedAt: new Date(),
+        };
+    
+
+        await this.bookModel.updateOne({ _id: book._id }, { $set: updateData }, { session });
 
         await this.stockModel.updateMany(
           { bookId: book._id },
@@ -681,12 +829,12 @@ export class BooksAdminService {
       });
 
       return ApiResponse.success(null, 'Book deleted successfully');
-    } finally {
+    } finally { 
       session.endSession();
     }
   }
 
-  async restoreBook(id: string, staffId?: string) {
+  async restoreBook(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
@@ -711,15 +859,16 @@ export class BooksAdminService {
         }
 
         // Restore Book
-        book.isDeleted = false;
-        (book as any).deletedAt = null;
-        if (staffId && Types.ObjectId.isValid(staffId)) {
-          (book as any).restoredBy = new Types.ObjectId(staffId);
-          (book as any).restoredAt = new Date();
-        }
-        await book.save({ session });
+        await this.bookModel.updateOne(
+          { _id: book._id },
+          { 
+            $set: { isDeleted: false },
+            $unset: { deletedAt: 1}
+          },
+          { session }
+        );
 
-        // Restore stock status (quantity remains 0, admin needs to update stock manually)
+        // Restore stock status 
         await this.stockModel.updateMany(
           { bookId: book._id },
           {
