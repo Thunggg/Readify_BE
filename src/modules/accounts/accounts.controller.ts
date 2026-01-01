@@ -28,6 +28,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { SuccessResponse } from 'src/shared/responses/success.response';
 import { VerifyRegisterDto } from './dto/verify-otp.dto';
+import { VerifyForgotPasswordOtpDto } from './dto/verify-forgot-password-otp.dto';
 
 @Controller('accounts')
 export class AccountsController {
@@ -113,17 +114,58 @@ export class AccountsController {
   }
 
   @Post('forgot-password')
-  forgotPassword(@Body() dto: ForgotPasswordRequestDto) {
-    return this.accountsService.forgotPassword(dto);
+  async forgotPassword(@Body() dto: ForgotPasswordRequestDto, @Res({ passthrough: true }) res: Response) {
+    const response = await this.accountsService.forgotPassword(dto);
+
+    const email = dto.email.trim().toLowerCase();
+    res.cookie('forgotPasswordEmail', email, {
+      httpOnly: true,
+      sameSite: 'lax', // dev OK
+      secure: false, // true khi HTTPS
+      maxAge: 15 * 60 * 1000, // 15 phút
+      path: '/',
+    });
+
+    return response;
+  }
+
+  @Post('forgot-password/verify-otp')
+  async verifyForgotPasswordOtp(
+    @Body() dto: VerifyForgotPasswordOtpDto,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const email = req?.cookies?.forgotPasswordEmail as string;
+    const response = await this.accountsService.verifyForgotPasswordOtp(email, dto.otp);
+
+    res.clearCookie('forgotPasswordEmail', { path: '/' });
+
+    res.cookie('resetPasswordToken', response.data.resetPasswordToken, {
+      httpOnly: true,
+      sameSite: 'lax', // dev OK
+      secure: false, // true when HTTPS
+      maxAge: 15 * 60 * 1000,
+      path: '/',
+    });
+
+    // Don't expose token in response body
+    return response;
   }
 
   @Post('forgot-password/re-send')
-  resendForgotPasswordOtp(@Body() dto: ForgotPasswordRequestDto) {
-    return this.accountsService.resendForgotPasswordOtp(dto);
+  resendForgotPasswordOtp(@Req() req: any, @Body() dto: ForgotPasswordRequestDto) {
+    const email = (req?.cookies?.forgotPasswordEmail as string) ?? dto?.email;
+    return this.accountsService.resendForgotPasswordOtp(email);
   }
 
   @Post('reset-password')
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.accountsService.resetPassword(dto);
+  async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const token = req?.cookies?.resetPasswordToken as string;
+    const response = await this.accountsService.resetPassword(token, dto);
+
+    res.clearCookie('resetPasswordToken', { path: '/' });
+    res.clearCookie('forgotPasswordEmail', { path: '/' });
+
+    return response;
   }
 }
