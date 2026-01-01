@@ -8,9 +8,6 @@ export class OrderItem {
   @Prop({ type: Types.ObjectId, ref: 'Book', required: true })
   bookId: Types.ObjectId;
 
-  @Prop({ required: true })
-  title: string;
-
   @Prop({ required: true, min: 1 })
   quantity: number;
 
@@ -36,8 +33,8 @@ export class Order {
 
   @Prop({
     required: true,
-    enum: ['CREATED', 'PENDING', 'PAID', 'PREPARING', 'DELIVERED', 'RECEIVED', 'CANCELLED'],
-    default: 'CREATED',
+    enum: ['PENDING', 'CONFIRMED', 'DELIVERED', 'COMPLETED', 'CANCELLED'],
+    default: 'PENDING',
   })
   status: string;
 
@@ -58,14 +55,14 @@ export class Order {
 
   @Prop({
     required: true,
-    enum: ['COD', 'VNPAY', 'MOMO'],
+    enum: ['COD', 'VNPAY'],
     default: 'COD',
   })
   paymentMethod: string;
 
   @Prop({
     required: true,
-    enum: ['UNPAID', 'PAID', 'REFUNDED'],
+    enum: ['UNPAID', 'PAID'],
     default: 'UNPAID',
   })
   paymentStatus: string;

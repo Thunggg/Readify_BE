@@ -17,11 +17,6 @@ export class CreateOrderItemDto {
   @IsString()
   @IsNotEmpty()
   bookId: string;
-
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
   @Type(() => Number)
   @IsNumber()
   @Min(1)
@@ -39,10 +34,6 @@ export class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @IsOptional()
-  @IsString()
-  userId?: string;
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
