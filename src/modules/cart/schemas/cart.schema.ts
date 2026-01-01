@@ -16,12 +16,6 @@ export class Cart {
 
   @Prop({ default: false })
   isSelected: boolean;
-
-  @Prop()
-  createdAt?: Date;
-
-  @Prop()
-  updatedAt?: Date;
 }
 
 export const CartSchema = SchemaFactory.createForClass(Cart);
