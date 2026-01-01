@@ -18,6 +18,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
+import { PendingRegistration, PendingRegistrationDocument } from './schemas/pendingRegistration.schema';
+import { JwtUtil } from 'src/shared/utils/jwt';
 
 @Injectable()
 export class AccountsService {
@@ -26,15 +28,17 @@ export class AccountsService {
     private readonly accountModel: Model<AccountDocument>,
     @InjectModel(RefreshToken.name)
     private readonly refreshTokenModel: Model<RefreshTokenDocument>,
+    @InjectModel(PendingRegistration.name)
+    private readonly pendingRegistrationModel: Model<PendingRegistrationDocument>,
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
+    private readonly jwtUtil: JwtUtil,
   ) {}
 
   async register(dto: RegisterAccountDto) {
     const email = dto.email.trim().toLowerCase();
 
-    const isEmailExists = await this.accountModel.findOne({ email });
-
+    const isEmailExists = await this.accountModel.exists({ email });
     if (isEmailExists) {
       throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
     }
@@ -51,18 +55,99 @@ export class AccountsService {
       this.configService.get<number>('bcrypt.saltRounds') as number,
     );
 
-    const newAccount = new this.accountModel({
+    const expiresInMinutes = Number(this.configService.get<number>('pendingRegistration.expiresInMinutes') ?? 15);
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000); // 15 phút
+
+    // Lưu pending registration (upsert) — CHƯA tạo Account
+    await this.pendingRegistrationModel.updateOne(
+      { email },
+      {
+        $set: {
+          email,
+          password: passwordHash,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          phone: dto.phone.trim(),
+          address: dto.address.trim(),
+          dateOfBirth: new Date(dto.dateOfBirth),
+          sex: dto.sex,
+          expiresAt,
+        },
+      },
+      { upsert: true },
+    );
+
+    // Gửi OTP verify email (nếu đã gửi rồi thì fallback sang resend)
+    try {
+      await this.otpService.sendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
+    } catch (err: any) {
+      await this.otpService.reSendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
+    }
+
+    return ApiResponse.success(null, 'OTP sent successfully. Please verify to complete registration.', 200);
+  }
+
+  async resendRegisterOtp(regEmail: string) {
+    const email = (regEmail ?? '').trim().toLowerCase();
+    if (!email) {
+      throw new HttpException(ErrorResponse.badRequest('Missing registration email cookie'), HttpStatus.BAD_REQUEST);
+    }
+
+    const pending = await this.pendingRegistrationModel.exists({ email });
+    if (!pending) {
+      throw new HttpException(ErrorResponse.notFound('Pending registration not found'), HttpStatus.NOT_FOUND);
+    }
+
+    await this.otpService.reSendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
+    return ApiResponse.success(null, 'OTP resent successfully', 200);
+  }
+
+  async verifyRegister(regEmail: string, otp: string) {
+    // nếu email không tồn tại trong cookie thì throw lỗi
+    const email = (regEmail ?? '').trim().toLowerCase();
+    if (!email) {
+      throw new HttpException(ErrorResponse.badRequest('Missing registration email cookie'), HttpStatus.BAD_REQUEST);
+    }
+
+    // nếu email đã tồn tại trong database thì throw lỗi
+    const isEmailExists = await this.accountModel.exists({ email });
+    if (isEmailExists) {
+      throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
+    }
+
+    // nếu email tồn tại trong pending registration thì lấy thông tin từ pending registration
+    const pending = await this.pendingRegistrationModel.findOne({ email }).select('+password').lean();
+    if (!pending) {
+      throw new HttpException(
+        ErrorResponse.notFound('Pending registration not found or expired'),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Verify OTP (đúng purpose VERIFY_EMAIL). Nếu OK otp record sẽ bị xoá trong otpService
+    await this.otpService.verifyOtp({ email, otp, purpose: OtpPurpose.VERIFY_EMAIL });
+
+    // Tạo Account thật
+    const created = await this.accountModel.create({
+      firstName: pending.firstName,
+      lastName: pending.lastName,
+      phone: pending.phone,
+      address: pending.address,
+      dateOfBirth: pending.dateOfBirth,
       email,
-      password: passwordHash,
-      status: 2,
-      role: 0,
-      sex: 0,
+      password: pending.password,
+      role: AccountRole.USER,
+      status: AccountStatus.ACTIVE,
+      sex: pending.sex ?? 0,
+      lastLoginAt: undefined,
+      isDeleted: false,
     });
 
-    const savedAccount = await newAccount.save();
-    const { password, ...account } = savedAccount.toObject();
+    // Xoá pending
+    await this.pendingRegistrationModel.deleteOne({ _id: pending._id });
 
-    return ApiResponse.success(account, 'Account created successfully', 200);
+    const { password, ...account } = created.toObject();
+    return ApiResponse.success(account, 'Registration verified and account created successfully', 200);
   }
 
   async me(userId: string) {
@@ -395,20 +480,62 @@ export class AccountsService {
     return ApiResponse.success(null, 'If the email exists, an OTP has been sent', 200);
   }
 
-  async resendForgotPasswordOtp(dto: ForgotPasswordRequestDto) {
-    const email = dto.email.trim().toLowerCase();
+  async resendForgotPasswordOtp(rawEmail: string) {
+    const email = (rawEmail ?? '').trim().toLowerCase();
+    if (!email) {
+      return ApiResponse.success(null, 'If the email exists, an OTP has been sent', 200);
+    }
 
     try {
       await this.otpService.reSendOtp({ email, purpose: OtpPurpose.FORGOT_PASSWORD });
     } catch (err) {
-      // không làm gì cả và trả về phản hồi thành công
+      // nếu bản ghi không tồn tại (hết hạn / không bao giờ gửi) thì gửi lại OTP
+      // nếu bản ghi tồn tại (cooldown / blocked / max resend) thì throw lỗi
+      if (err instanceof HttpException && err.getStatus() === 404) {
+        await this.otpService.sendOtp({ email, purpose: OtpPurpose.FORGOT_PASSWORD });
+      } else {
+        throw err;
+      }
     }
 
     return ApiResponse.success(null, 'If the email exists, an OTP has been sent', 200);
   }
 
-  async resetPassword(dto: ResetPasswordDto) {
-    const email = dto.email.trim().toLowerCase();
+  async verifyForgotPasswordOtp(regEmail: string, otp: string) {
+    const email = (regEmail ?? '').trim().toLowerCase();
+    if (!email) {
+      throw new HttpException(ErrorResponse.badRequest('Missing forgotPasswordEmail cookie'), HttpStatus.BAD_REQUEST);
+    }
+
+    const account = await this.accountModel.findOne({ email });
+    if (!account) {
+      throw new HttpException(ErrorResponse.notFound('OTP record not found'), HttpStatus.NOT_FOUND);
+    }
+
+    if (account?.status !== AccountStatus.ACTIVE || account?.isDeleted === true) {
+      throw new HttpException(ErrorResponse.badRequest('Account is delete or banned'), HttpStatus.BAD_REQUEST);
+    }
+
+    await this.otpService.verifyOtp({ email, otp, purpose: OtpPurpose.FORGOT_PASSWORD });
+
+    const secret =
+      (this.configService.get<string>('jwt.resetPasswordSecret') as string) ||
+      (this.configService.get<string>('jwt.accessTokenSecret') as string);
+    const expiresIn = Number(this.configService.get<number>('jwt.resetPasswordExpiresIn') ?? 15 * 60);
+
+    const resetPasswordToken = this.jwtUtil.signResetPasswordToken(
+      { sub: account._id as any, email: account.email, purpose: 'reset_password' },
+      secret,
+      expiresIn,
+    );
+
+    return ApiResponse.success({ resetPasswordToken }, 'Verify OTP successfully', 200);
+  }
+
+  async resetPassword(resetPasswordToken: string, dto: ResetPasswordDto) {
+    if (!resetPasswordToken) {
+      throw new HttpException(ErrorResponse.badRequest('Missing resetPasswordToken cookie'), HttpStatus.BAD_REQUEST);
+    }
 
     if (dto.newPassword !== dto.confirmPassword) {
       throw new HttpException(
@@ -417,9 +544,22 @@ export class AccountsService {
       );
     }
 
-    await this.otpService.verifyOtp({ email, otp: dto.otp, purpose: OtpPurpose.FORGOT_PASSWORD });
+    const secret =
+      (this.configService.get<string>('jwt.resetPasswordSecret') as string) ||
+      (this.configService.get<string>('jwt.accessTokenSecret') as string);
 
-    const account = await this.accountModel.findOne({ email });
+    let payload: { sub: any; email: string; purpose: string };
+    try {
+      payload = this.jwtUtil.verifyResetPasswordToken(resetPasswordToken, secret) as any;
+    } catch {
+      throw new HttpException(ErrorResponse.badRequest('Invalid or expired reset token'), HttpStatus.BAD_REQUEST);
+    }
+
+    if (payload?.purpose !== 'reset_password') {
+      throw new HttpException(ErrorResponse.badRequest('Invalid reset token purpose'), HttpStatus.BAD_REQUEST);
+    }
+
+    const account = await this.accountModel.findById(payload.sub).select('+password');
     if (!account) {
       throw new HttpException(
         ApiResponse.error('Account not found', 'ACCOUNT_NOT_FOUND', HttpStatus.NOT_FOUND),
@@ -427,8 +567,21 @@ export class AccountsService {
       );
     }
 
+    if (account?.status !== AccountStatus.ACTIVE || account?.isDeleted === true) {
+      throw new HttpException(
+        ApiResponse.error('Account is delete or banned', 'ACCOUNT_IS_DELETED_OR_BANNED', HttpStatus.BAD_REQUEST),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (payload.email && payload.email !== account.email) {
+      throw new HttpException(ErrorResponse.badRequest('Reset token email mismatch'), HttpStatus.BAD_REQUEST);
+    }
+
     account.password = await hashPassword(dto.newPassword, Number(this.configService.get<number>('bcrypt.saltRounds')));
     await account.save();
+
+    await this.refreshTokenModel.deleteMany({ userId: account._id });
 
     const { password, ...accountData } = account.toObject();
     return ApiResponse.success(accountData, 'Password reset successfully', 200);

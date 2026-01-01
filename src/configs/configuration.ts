@@ -49,4 +49,9 @@ export default () => ({
     maxResendCount: Number(process.env.OTP_MAX_RESEND_COUNT ?? 10),
     maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS ?? 10),
   },
+
+  // Pending Registration
+  pendingRegistration: {
+    expiresInMinutes: Number(process.env.PENDING_REGISTRATION_EXPIRES_IN_MINUTES ?? 15),
+  },
 });
