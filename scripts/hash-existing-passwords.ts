@@ -14,10 +14,12 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
+// TypeScript type narrowing: after the check above, MONGODB_URI is guaranteed to be a string
+const uri: string = MONGODB_URI;
 const SALT_ROUNDS = 10;
 
 async function hashExistingPasswords() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(uri);
 
   try {
     await client.connect();
