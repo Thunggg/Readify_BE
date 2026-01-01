@@ -72,12 +72,6 @@ export class UpdateBookDto {
   basePrice?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  originalPrice?: number;
-
-  @IsOptional()
   @IsString()
   currency?: string;
 
