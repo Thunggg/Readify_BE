@@ -20,10 +20,6 @@ export class Category {
   @Prop({ trim: true })
   iconUrl?: string;
 
-  // Category tree support (optional)
-  //   @Prop({ type: Types.ObjectId, ref: 'Category', index: true })
-  //   parentId?: Types.ObjectId;
-
   // Ordering in menu
   @Prop({ default: 0, index: true })
   sortOrder: number;
