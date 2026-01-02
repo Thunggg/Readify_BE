@@ -1,63 +1,14 @@
-import {
-  IsString,
-  IsEnum,
-  IsNumber,
-  IsArray,
-  IsOptional,
-  Min,
-  ValidateNested,
-  IsNotEmpty,
-  MinLength,
-} from 'class-validator';
+import { IsString, IsEnum, IsArray, IsOptional, IsNotEmpty, MinLength, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from '../constants/order.enum';
 import type { PaymentMethodValue } from '../constants/order.enum';
 
-export class CreateOrderItemDto {
-  @IsString()
-  @IsNotEmpty()
-  bookId: string;
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  quantity: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  unitPrice: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  subtotal: number;
-}
-
 export class CreateOrderDto {
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateOrderItemDto)
-  items: CreateOrderItemDto[];
-
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  totalAmount: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  discountAmount?: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  finalAmount: number;
-
-  @IsOptional()
-  @IsString()
-  promotionId?: string;
+  @ArrayMinSize(1, { message: 'Must select at least one item from cart' })
+  @IsString({ each: true })
+  @Type(() => String)
+  selectedCartItemIds: string[];
 
   @IsString()
   @IsNotEmpty()
@@ -66,6 +17,10 @@ export class CreateOrderDto {
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethodValue;
+
+  @IsOptional()
+  @IsString()
+  promotionCode?: string;
 
   @IsOptional()
   @IsString()
