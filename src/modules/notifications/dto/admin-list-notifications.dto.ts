@@ -1,8 +1,12 @@
-import { IsEnum, IsInt, IsOptional, IsBoolean, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsBoolean, IsMongoId, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { NotificationType } from '../enums/notification-type.enum';
 
-export class ListNotificationsDto {
+export class AdminListNotificationsDto {
+  @IsOptional()
+  @IsMongoId()
+  userId?: string;
+
   @IsOptional()
   @IsEnum(NotificationType)
   type?: NotificationType;
@@ -25,5 +29,4 @@ export class ListNotificationsDto {
   @Max(50)
   limit: number = 10;
 }
-
 

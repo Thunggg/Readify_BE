@@ -1,12 +1,7 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum, IsMongoId, MaxLength, MinLength } from 'class-validator';
-
-export enum NotificationType {
-  ORDER = 'ORDER',
-  PROMOTION = 'PROMOTION',
-  SYSTEM = 'SYSTEM',
-  ACCOUNT = 'ACCOUNT',
-  OTHER = 'OTHER',
-}
+import { IsNotEmpty, IsOptional, IsString, IsEnum, IsMongoId, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { NotificationType } from '../enums/notification-type.enum';
+import { NotificationMetadataDto } from './notification-metadata.dto';
 
 export class CreateNotificationDto {
   @IsOptional()
@@ -36,6 +31,11 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsMongoId()
   relatedPromotionId?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NotificationMetadataDto)
+  metadata?: NotificationMetadataDto;
 }
 
 

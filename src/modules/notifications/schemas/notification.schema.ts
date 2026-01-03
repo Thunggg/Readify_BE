@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
+import { NotificationType } from '../enums/notification-type.enum';
 
 export type NotificationDocument = HydratedDocument<Notification>;
 
@@ -16,23 +17,20 @@ export class Notification {
 
   @Prop({
     type: String,
-    enum: ['ORDER', 'PROMOTION', 'SYSTEM', 'ACCOUNT', 'OTHER'],
-    default: 'SYSTEM',
+    enum: Object.values(NotificationType),
+    default: NotificationType.SYSTEM,
     index: true,
   })
   type: string;
-
-  @Prop({ default: false, index: true })
-  isRead: boolean;
-
-  @Prop()
-  readAt?: Date;
 
   @Prop({ type: Types.ObjectId, ref: 'Order' })
   relatedOrderId?: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Promotion' })
   relatedPromotionId?: Types.ObjectId;
+
+  @Prop({ type: Object, default: {} })
+  metadata?: Record<string, any>; // Additional data (e.g., orderCode, bookId, etc.)
 
   @Prop({ default: true })
   isActive: boolean;
@@ -41,7 +39,7 @@ export class Notification {
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
 
 // Indexes for performance
-NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+NotificationSchema.index({ userId: 1, createdAt: -1 });
 NotificationSchema.index({ userId: 1, type: 1, createdAt: -1 });
 NotificationSchema.index({ isActive: 1, createdAt: -1 });
 
