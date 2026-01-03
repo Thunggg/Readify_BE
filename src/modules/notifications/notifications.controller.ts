@@ -45,10 +45,9 @@ export class NotificationsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(AccountRole.ADMIN)
-  deleteNotification(@Param() params: NotificationIdDto) {
-    return this.notificationsService.deleteNotification(params.id);
+  @UseGuards(JwtAuthGuard)
+  deleteNotification(@Param() params: NotificationIdDto, @Req() req: any) {
+    return this.notificationsService.deleteNotification(params.id, req?.user?.userId, req?.user?.role);
   }
 
   // Admin endpoints - Full management capabilities

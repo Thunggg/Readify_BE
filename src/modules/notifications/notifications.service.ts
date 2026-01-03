@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument } from './schemas/notification.schema';
@@ -302,7 +302,7 @@ export class NotificationsService {
     );
   }
 
-  async deleteNotification(notificationId: string) {
+  async deleteNotification(notificationId: string, currentUserId: string, currentUserRole?: number) {
     // Validate notificationId
     if (!Types.ObjectId.isValid(notificationId)) {
       throw new HttpException(
@@ -323,8 +323,13 @@ export class NotificationsService {
       );
     }
 
-    // Role check is handled by @Roles(AccountRole.ADMIN) decorator in controller
-    // Only admin can reach this point
+    // Check permission: user can only delete their own notifications, admin can delete any
+    const isAdmin = currentUserRole === AccountRole.ADMIN;
+    const isOwner = notification.userId.toString() === currentUserId;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException('You can only delete your own notifications');
+    }
 
     // Soft delete
     notification.isActive = false;
