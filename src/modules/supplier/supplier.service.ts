@@ -249,6 +249,15 @@ export class SupplierService {
       );
     }
 
+    // Kiểm tra xem supplier có đang quản lý sách nào không
+    // Chỉ cho phép xóa supplier khi không còn sách liên kết
+    if (supplier.bookIds && supplier.bookIds.length > 0) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'bookIds', message: 'Cannot delete supplier with existing books' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     // SOFT DELETE - Xóa mềm (chỉ đánh dấu, không xóa khỏi database)
     // Lý do: Giữ lại dữ liệu để audit, có thể restore sau
     supplier.isDeleted = true;
