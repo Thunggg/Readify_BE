@@ -251,7 +251,6 @@ export class AccountsService {
       lastName: dto.lastName?.trim(),
       dateOfBirth: dto.dateOfBirth,
       phone: dto.phone,
-      avatarUrl: dto.avatarUrl,
       address: dto.address,
       email,
       password: passwordHash,
