@@ -6,6 +6,9 @@ import { ListNotificationsDto } from './dto/list-notifications.dto';
 import { AdminListNotificationsDto } from './dto/admin-list-notifications.dto';
 import { NotificationIdDto } from './dto/notification-id.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { AccountRole } from '../staff/constants/staff.enum';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -42,19 +45,25 @@ export class NotificationsController {
   }
 
   @Delete(':id')
-  deleteNotification(@Param() params: NotificationIdDto, @Req() req: any) {
-    return this.notificationsService.deleteNotification(params.id, req?.user?.userId, req?.user?.role);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  deleteNotification(@Param() params: NotificationIdDto) {
+    return this.notificationsService.deleteNotification(params.id);
   }
 
   // Admin endpoints
   @Get('admin/all')
-  getAdminNotificationsList(@Query() query: AdminListNotificationsDto, @Req() req: any) {
-    return this.notificationsService.getAdminNotificationsList(query, req?.user?.role);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  getAdminNotificationsList(@Query() query: AdminListNotificationsDto) {
+    return this.notificationsService.getAdminNotificationsList(query);
   }
 
   @Get('admin/:id')
-  getAdminNotificationDetail(@Param() params: NotificationIdDto, @Req() req: any) {
-    return this.notificationsService.getAdminNotificationDetail(params.id, req?.user?.role);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  getAdminNotificationDetail(@Param() params: NotificationIdDto) {
+    return this.notificationsService.getAdminNotificationDetail(params.id);
   }
 }
 

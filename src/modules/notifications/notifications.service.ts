@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument } from './schemas/notification.schema';
@@ -302,7 +302,7 @@ export class NotificationsService {
     );
   }
 
-  async deleteNotification(notificationId: string, currentUserId: string, currentUserRole?: number) {
+  async deleteNotification(notificationId: string) {
     // Validate notificationId
     if (!Types.ObjectId.isValid(notificationId)) {
       throw new HttpException(
@@ -323,13 +323,8 @@ export class NotificationsService {
       );
     }
 
-    // Check permission: user can only delete their own notifications, admin can delete any
-    const isAdmin = currentUserRole === AccountRole.ADMIN;
-    const isOwner = notification.userId.toString() === currentUserId;
-
-    if (!isAdmin && !isOwner) {
-      throw new ForbiddenException('You can only delete your own notifications');
-    }
+    // Role check is handled by @Roles(AccountRole.ADMIN) decorator in controller
+    // Only admin can reach this point
 
     // Soft delete
     notification.isActive = false;
@@ -386,11 +381,9 @@ export class NotificationsService {
     );
   }
 
-  async getAdminNotificationsList(query: AdminListNotificationsDto, currentUserRole?: number) {
-    // Check role - only admin can access
-    if (currentUserRole !== AccountRole.ADMIN) {
-      throw new ForbiddenException('Only admin can view all notifications');
-    }
+  async getAdminNotificationsList(query: AdminListNotificationsDto) {
+    // Role check is handled by @Roles(AccountRole.ADMIN) decorator in controller
+    // Only admin can reach this point
 
     const { userId, type, isRead, page = 1, limit = 10 } = query;
 
@@ -540,11 +533,9 @@ export class NotificationsService {
     );
   }
 
-  async getAdminNotificationDetail(notificationId: string, currentUserRole?: number) {
-    // Check role - only admin can access
-    if (currentUserRole !== AccountRole.ADMIN) {
-      throw new ForbiddenException('Only admin can view notification details');
-    }
+  async getAdminNotificationDetail(notificationId: string) {
+    // Role check is handled by @Roles(AccountRole.ADMIN) decorator in controller
+    // Only admin can reach this point
 
     // Validate notificationId
     if (!Types.ObjectId.isValid(notificationId)) {
