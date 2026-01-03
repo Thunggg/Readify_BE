@@ -56,7 +56,7 @@ export class Promotion {
 
 export const PromotionSchema = SchemaFactory.createForClass(Promotion);
 
-PromotionSchema.index({ code: 1 });
+// Note: code field already has unique index from @Prop({ unique: true })
 PromotionSchema.index({ status: 1 });
 PromotionSchema.index({ startDate: 1, endDate: 1 });
 PromotionSchema.index({ createdAt: -1 });

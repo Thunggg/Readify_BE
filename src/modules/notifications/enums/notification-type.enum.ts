@@ -5,4 +5,3 @@ export enum NotificationType {
   ACCOUNT = 'ACCOUNT',
   OTHER = 'OTHER',
 }
-

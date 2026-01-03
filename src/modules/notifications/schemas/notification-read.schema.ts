@@ -5,10 +5,10 @@ export type NotificationReadDocument = HydratedDocument<NotificationRead>;
 
 @Schema({ timestamps: true })
 export class NotificationRead {
-  @Prop({ type: Types.ObjectId, ref: 'Notification', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Notification', required: true })
   notificationId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Account', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Account', required: true })
   userId: Types.ObjectId;
 
   @Prop({ type: Date, default: Date.now })

@@ -18,8 +18,8 @@ export class AuthController {
 
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 15 * 60 * 1000, // 15 phút
       path: '/',
     });
@@ -30,7 +30,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: { user: { userId: string }; cookies: { accessToken?: string } }, @Res({ passthrough: true }) res: Response) {
     const response = await this.authService.logout(req?.cookies?.accessToken as string);
     res.clearCookie('accessToken');
     return response;
