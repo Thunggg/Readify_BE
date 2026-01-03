@@ -51,7 +51,7 @@ export class NotificationsController {
     return this.notificationsService.deleteNotification(params.id);
   }
 
-  // Admin endpoints
+  // Admin endpoints - Full management capabilities
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(AccountRole.ADMIN)
