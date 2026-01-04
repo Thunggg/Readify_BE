@@ -40,7 +40,12 @@ export class AccountsService {
 
     const isEmailExists = await this.accountModel.exists({ email });
     if (isEmailExists) {
-      throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
+      throw new HttpException(
+        ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
+          { field: 'email', message: 'Email already exists' },
+        ]),
+        400,
+      );
     }
 
     if (dto.password !== dto.confirmPassword) {
@@ -96,7 +101,12 @@ export class AccountsService {
     // nếu email đã tồn tại trong database thì throw lỗi
     const isEmailExists = await this.accountModel.exists({ email });
     if (isEmailExists) {
-      throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
+      throw new HttpException(
+        ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
+          { field: 'email', message: 'Email already exists' },
+        ]),
+        400,
+      );
     }
 
     // nếu email tồn tại trong pending registration thì lấy thông tin từ pending registration
@@ -241,7 +251,12 @@ export class AccountsService {
     const isEmailExists = await this.accountModel.findOne({ email });
 
     if (isEmailExists) {
-      throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
+      throw new HttpException(
+        ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
+          { field: 'email', message: 'Email already exists' },
+        ]),
+        400,
+      );
     }
 
     const passwordHash = await hashPassword(dto.password, Number(this.configService.get<number>('bcrypt.saltRounds')));
@@ -284,7 +299,12 @@ export class AccountsService {
       const email = dto.email.trim().toLowerCase();
       const exists = await this.accountModel.exists({ email, _id: { $ne: account._id } });
       if (exists) {
-        throw new HttpException(ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400), 400);
+        throw new HttpException(
+          ApiResponse.error('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
+            { field: 'email', message: 'Email already exists' },
+          ]),
+          400,
+        );
       }
       account.email = email;
     }

@@ -9,7 +9,6 @@ export interface ErrorDetail {
 
 export interface ErrorData {
   code: string;
-  message: string;
   details?: ErrorDetail[];
 }
 
@@ -22,7 +21,6 @@ export class ErrorResponse extends BaseResponse<ErrorData> {
   ) {
     const errorData: ErrorData = {
       code: errorCode,
-      message,
       details,
     };
 
