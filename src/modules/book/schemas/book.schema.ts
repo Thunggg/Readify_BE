@@ -84,12 +84,12 @@ export class Book {
   @Prop({ default: 0, index: true })
   soldCount: number;
 
-  // Ratings summary (if you have ReviewsModule later)
-  // @Prop({ default: 0 })
-  // ratingAvg: number;
+  // Ratings summary
+  @Prop({ default: 0, min: 0, max: 5 })
+  ratingAvg: number;
 
-  // @Prop({ default: 0 })
-  // ratingCount: number;
+  @Prop({ default: 0, min: 0 })
+  ratingCount: number;
 
   // Tags for quick filtering/search
   @Prop({ type: [String], default: [], index: true })

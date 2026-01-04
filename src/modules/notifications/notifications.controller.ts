@@ -25,6 +25,21 @@ export class NotificationsController {
     return this.notificationsService.getNotificationsList(query, req?.user?.userId);
   }
 
+  // Admin endpoints - Must be before :id routes to avoid route conflicts
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  getAdminNotificationsList(@Query() query: AdminListNotificationsDto) {
+    return this.notificationsService.getAdminNotificationsList(query);
+  }
+
+  @Get('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  getAdminNotificationDetail(@Param() params: NotificationIdDto) {
+    return this.notificationsService.getAdminNotificationDetail(params.id);
+  }
+
   @Get(':id')
   getNotificationDetail(@Param() params: NotificationIdDto, @Req() req: any) {
     return this.notificationsService.getNotificationDetail(params.id, req?.user?.userId);
@@ -48,21 +63,6 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   deleteNotification(@Param() params: NotificationIdDto, @Req() req: any) {
     return this.notificationsService.deleteNotification(params.id, req?.user?.userId, req?.user?.role);
-  }
-
-  // Admin endpoints - Full management capabilities
-  @Get('admin/all')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(AccountRole.ADMIN)
-  getAdminNotificationsList(@Query() query: AdminListNotificationsDto) {
-    return this.notificationsService.getAdminNotificationsList(query);
-  }
-
-  @Get('admin/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(AccountRole.ADMIN)
-  getAdminNotificationDetail(@Param() params: NotificationIdDto) {
-    return this.notificationsService.getAdminNotificationDetail(params.id);
   }
 }
 

@@ -21,14 +21,15 @@ export class NotificationsService {
   ) {}
 
   async createNotification(dto: CreateNotificationDto, currentUserId?: string) {
-    const userId = dto.userId ? new Types.ObjectId(dto.userId) : new Types.ObjectId(currentUserId);
-
-    if (!userId) {
+    // Validate that we have a userId from either dto or currentUserId
+    if (!dto.userId && !currentUserId) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'userId', message: 'User ID is required' }]),
         HttpStatus.BAD_REQUEST,
       );
     }
+
+    const userId = dto.userId ? new Types.ObjectId(dto.userId) : new Types.ObjectId(currentUserId);
 
     const notification = await this.notificationModel.create({
       userId,

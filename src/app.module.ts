@@ -20,6 +20,7 @@ import { MailModule } from './modules/mail/mail.module';
 import { OtpModule } from './modules/otp/otp.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
     OtpModule,
     NotificationsModule,
     CategoriesModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
