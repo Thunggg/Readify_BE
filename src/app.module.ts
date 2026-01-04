@@ -11,6 +11,10 @@ import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
 import { BookModule } from './modules/book/books.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { BookModule } from './modules/book/book.module';
+import { OrdersModule } from './modules/orders/orders.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 import { PromotionLogModule } from './modules/promotion-log/promotion-log.module';
 import { OrderModule } from './modules/order/order.module';
@@ -36,6 +40,10 @@ import { OtpModule } from './modules/otp/otp.module';
     SupplierModule,
     BookModule,
     AuthModule,
+    NotificationsModule,
+    CategoriesModule,
+    BookModule,
+    OrdersModule,
     PromotionModule,
     PromotionLogModule,
     OrderModule,
