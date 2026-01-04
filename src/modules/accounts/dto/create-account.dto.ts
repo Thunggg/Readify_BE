@@ -56,12 +56,6 @@ export class CreateAccountDto {
   @MinLength(1, { message: 'Address can not be empty' })
   address?: string;
 
-  @IsEnum(AccountRole)
-  @Type(() => Number)
-  @IsInt({ message: 'Role must be a number' })
-  @Prop({ default: AccountRole.USER })
-  role: number;
-
   // 1: active, 0: inactive, 2: not active email
   @Type(() => Number)
   @IsInt({ message: 'Status must be a number' })

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -157,7 +158,7 @@ export class AccountsController {
     return this.accountsService.createAccount(dto);
   }
 
-  @Patch('edit/:id')
+  @Put('edit/:id')
   editAccount(@Param() params: AccountIdDto, @Body() dto: UpdateAccountDto) {
     return this.accountsService.editAccount(params.id, dto);
   }
