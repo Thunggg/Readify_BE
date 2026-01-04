@@ -147,6 +147,10 @@ export class CartService {
       throw new BadRequestException('Invalid userId');
     }
 
+    // Validate và tự động cập nhật số lượng trong cart dựa trên stock hiện tại
+    const validationResult = await this.validateCartStock(userId);
+
+    // Lấy lại cart items sau khi đã validate và update
     const cartItems = await this.cartModel
       .find({ userId: new Types.ObjectId(userId) })
       .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
@@ -154,7 +158,74 @@ export class CartService {
       .lean()
       .exec();
 
-    return ApiResponse.success(cartItems, 'Cart retrieved successfully');
+    return ApiResponse.success(
+      {
+        items: cartItems,
+        validation: {
+          updated: validationResult.updated,
+          removed: validationResult.removed,
+          warnings: validationResult.warnings,
+        },
+      },
+      'Cart retrieved successfully',
+    );
+  }
+
+  /**
+   * Validate số lượng trong cart so với stock hiện tại
+   * Tự động cập nhật hoặc xóa items nếu stock không đủ
+   */
+  async validateCartStock(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
+    }
+
+    const cartItems = await this.cartModel.find({ userId: new Types.ObjectId(userId) });
+    const warnings: any[] = [];
+    const updated: any[] = [];
+    const removed: any[] = [];
+
+    // Duyệt qua từng item trong cart
+    for (const item of cartItems) {
+      const stock = await this.stockModel.findOne({ bookId: item.bookId });
+
+      // Nếu không tìm thấy stock hoặc stock = 0 => xóa item khỏi cart
+      if (!stock || stock.quantity === 0) {
+        await this.cartModel.deleteOne({ _id: item._id });
+        removed.push({
+          bookId: item.bookId,
+          oldQuantity: item.quantity,
+          reason: 'out_of_stock',
+        });
+        warnings.push({
+          bookId: item.bookId,
+          message: 'Book is out of stock and has been removed from cart',
+        });
+        continue;
+      }
+
+      // Nếu số lượng trong cart > stock hiện tại => cập nhật về số lượng tối đa có thể
+      if (item.quantity > stock.quantity) {
+        item.quantity = stock.quantity;
+        await item.save();
+        updated.push({
+          bookId: item.bookId,
+          oldQuantity: item.quantity,
+          newQuantity: stock.quantity,
+        });
+        warnings.push({
+          bookId: item.bookId,
+          message: `Quantity adjusted from ${item.quantity} to ${stock.quantity} due to stock availability`,
+          availableStock: stock.quantity,
+        });
+      }
+    }
+
+    return {
+      updated,
+      removed,
+      warnings,
+    };
   }
 
   async clearCart(userId: string) {
