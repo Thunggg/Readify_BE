@@ -32,23 +32,28 @@ export class CreateAccountDto {
 
   @IsString({ message: 'First name must be a string' })
   @MaxLength(100, { message: 'First name must be less than 100 characters long' })
+  @MinLength(1, { message: 'First name can not be empty' })
   firstName?: string;
 
   @IsString({ message: 'Last name must be a string' })
   @MaxLength(100, { message: 'Last name must be less than 100 characters long' })
+  @MinLength(1, { message: 'Last name can not be empty' })
   lastName?: string;
 
   @IsString({ message: 'dateOfBirth must be a valid ISO date string' })
   @IsNotEmpty({ message: 'dateOfBirth can not be empty' })
   @MinAge(16, { message: 'You must be at least 16 years old' })
+  @MinLength(1, { message: 'dateOfBirth can not be empty' })
   dateOfBirth?: Date;
 
   @IsString({ message: 'Phone must be a string' })
   @MaxLength(20, { message: 'Phone must be less than 20 characters long' })
+  @MinLength(1, { message: 'Phone can not be empty' })
   phone?: string;
 
   @IsString({ message: 'Address must be a string' })
   @MaxLength(255, { message: 'Address must be less than 255 characters long' })
+  @MinLength(1, { message: 'Address can not be empty' })
   address?: string;
 
   @IsEnum(AccountRole)
