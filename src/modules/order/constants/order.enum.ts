@@ -1,10 +1,8 @@
 export const OrderStatus = {
-  CREATED: 'CREATED',
   PENDING: 'PENDING',
-  PAID: 'PAID',
-  PREPARING: 'PREPARING',
+  CONFIRMED: 'CONFIRMED',
   DELIVERED: 'DELIVERED',
-  RECEIVED: 'RECEIVED',
+  COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
 } as const;
 
@@ -13,7 +11,6 @@ export type OrderStatusValue = (typeof OrderStatus)[keyof typeof OrderStatus];
 export const PaymentMethod = {
   COD: 'COD',
   VNPAY: 'VNPAY',
-  MOMO: 'MOMO',
 } as const;
 
 export type PaymentMethodValue = (typeof PaymentMethod)[keyof typeof PaymentMethod];
@@ -21,7 +18,6 @@ export type PaymentMethodValue = (typeof PaymentMethod)[keyof typeof PaymentMeth
 export const PaymentStatus = {
   UNPAID: 'UNPAID',
   PAID: 'PAID',
-  REFUNDED: 'REFUNDED',
 } as const;
 
 export type PaymentStatusValue = (typeof PaymentStatus)[keyof typeof PaymentStatus];

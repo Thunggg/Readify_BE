@@ -1,15 +1,14 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateOrderDto } from './create-order.dto';
-import { IsEnum, IsOptional } from 'class-validator';
-import { OrderStatus, PaymentStatus } from '../constants/order.enum';
-import type { OrderStatusValue, PaymentStatusValue } from '../constants/order.enum';
+import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { OrderStatus } from '../constants/order.enum';
+import type { OrderStatusValue } from '../constants/order.enum';
 
-export class UpdateOrderDto extends PartialType(CreateOrderDto) {
+export class UpdateOrderDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(10, { message: 'Shipping address must be at least 10 characters' })
+  shippingAddress?: string;
+
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatusValue;
-
-  @IsOptional()
-  @IsEnum(PaymentStatus)
-  paymentStatus?: PaymentStatusValue;
 }
