@@ -4,7 +4,7 @@ import { Model, Types } from 'mongoose';
 import { CloudinaryService } from './cloudinary/cloudinary.service';
 import { Media, MediaStatus, MediaType } from './schemas/media.schema';
 import { UploadMediaDto } from './dto/upload-media.dto';
-import { ApiResponse } from 'src/shared/responses/api-response';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Injectable()
 export class MediaService {
@@ -44,7 +44,7 @@ export class MediaService {
       size: file.size,
     });
 
-    return ApiResponse.success(doc, 'Media uploaded successfully', HttpStatus.CREATED);
+    return new SuccessResponse(doc, 'Media uploaded successfully', HttpStatus.CREATED);
   }
 
   async remove(mediaId: string, userId?: string) {
@@ -60,7 +60,7 @@ export class MediaService {
     await this.cloudinaryService.destroy(media.publicId);
 
     await this.mediaModel.deleteOne({ _id: media._id });
-    return ApiResponse.success(null, 'Media deleted successfully', HttpStatus.OK);
+    return new SuccessResponse(null, 'Media deleted successfully', HttpStatus.OK);
   }
 
   // Used by cron cleanup
@@ -86,6 +86,6 @@ export class MediaService {
       createdAt: { $lt: cutoff },
     });
 
-    return ApiResponse.success(res.deletedCount ?? 0, 'Media deleted successfully', HttpStatus.OK);
+    return new SuccessResponse(res.deletedCount ?? 0, 'Media deleted successfully', HttpStatus.OK);
   }
 }

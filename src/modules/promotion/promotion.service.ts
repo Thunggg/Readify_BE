@@ -17,7 +17,8 @@ import { ApplyPromotionDto } from './dto/apply-promotion.dto';
 import { PromotionSortBy, PromotionStatus, SortOrder } from './constants/promotion.enum';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 
-import { ApiResponse } from '../../shared/responses/api-response';
+import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class PromotionService {
@@ -114,7 +115,7 @@ export class PromotionService {
       this.promotionModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -153,7 +154,7 @@ export class PromotionService {
       throw new NotFoundException('Promotion not found');
     }
 
-    return ApiResponse.success(promotion, 'Get promotion detail success');
+    return new SuccessResponse(promotion, 'Get promotion detail success');
   }
 
   async createPromotion(createDto: CreatePromotionDto, currentUser: string) {
@@ -203,7 +204,7 @@ export class PromotionService {
       .populate('createdBy', 'firstName lastName email')
       .lean();
 
-    return ApiResponse.success(promotion, 'Promotion created successfully');
+    return new SuccessResponse(promotion, 'Promotion created successfully');
   }
 
   async updatePromotion(promotionId: string, updateDto: UpdatePromotionDto, currentUser: string) {
@@ -306,7 +307,7 @@ export class PromotionService {
       .populate('updatedBy', 'firstName lastName email')
       .lean();
 
-    return ApiResponse.success(updatedPromotion, 'Promotion updated successfully');
+    return new SuccessResponse(updatedPromotion, 'Promotion updated successfully');
   }
 
   async deletePromotion(promotionId: string, currentUser: string) {
@@ -338,7 +339,7 @@ export class PromotionService {
 
     await this.promotionModel.updateOne({ _id: promotionId }, { $set: { isDeleted: true } });
 
-    return ApiResponse.success(null, 'Promotion deleted successfully');
+    return new SuccessResponse(null, 'Promotion deleted successfully');
   }
 
   async applyPromotion(applyDto: ApplyPromotionDto, currentUser: string) {
@@ -414,7 +415,7 @@ export class PromotionService {
 
     await this.promotionModel.updateOne({ _id: promotion._id }, { $inc: { usedCount: 1 } });
 
-    return ApiResponse.success(
+    return new SuccessResponse(
       {
         promotionCode: promotion.code,
         promotionName: promotion.name,

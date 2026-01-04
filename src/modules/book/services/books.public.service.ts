@@ -3,10 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Book } from '../schemas/book.schema';
 import { SearchPublicBooksDto } from '../dto/search-public-books.dto';
-import { ApiResponse } from '../../../shared/responses/api-response';
 import { ErrorResponse } from '../../../shared/responses/error.response';
 import { SortOrder } from 'mongoose';
 import { SearchBookSuggestionsDto } from '../dto/search-book-suggestions.dto';
+import { PaginatedResponse } from '../../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../../shared/responses/success.response';
 
 @Injectable()
 export class BooksPublicService {
@@ -86,7 +87,7 @@ export class BooksPublicService {
       this.bookModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(items, { page, limit, total }, 'Get books list successfully');
+    return new PaginatedResponse(items, { page, limit, total }, 'Get books list successfully');
   }
 
 
@@ -96,7 +97,7 @@ export class BooksPublicService {
 
     // Không search khi keyword quá ngắn
     if (!keyword || keyword.length < 2) {
-      return ApiResponse.success({ items: [] }, 'Get book suggestions successfully');
+      return new SuccessResponse({ items: [] }, 'Get book suggestions successfully');
     }
 
     const items = await this.bookModel
@@ -120,7 +121,7 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items }, 'Get book suggestions successfully');
+    return new SuccessResponse({ items }, 'Get book suggestions successfully');
   }
 
   async getBookDetailById(id: string) {
@@ -161,7 +162,7 @@ export class BooksPublicService {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Get book detail successfully');
+    return new SuccessResponse(book, 'Get book detail successfully');
   }
 
   async getBookDetailBySlug(slug: string) {
@@ -203,7 +204,7 @@ export class BooksPublicService {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Get book detail successfully');
+    return new SuccessResponse(book, 'Get book detail successfully');
   }
 
   async getRelatedBooks(bookId: string, limitParam?: string) {
@@ -262,7 +263,7 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items }, 'Get related books successfully');
+    return new SuccessResponse({ items }, 'Get related books successfully');
   }
 
   async getRelatedBookBySlug(bookSlug: string, limitParam?: string) {
@@ -317,6 +318,6 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items }, 'Get related books successfully');
+    return new SuccessResponse({ items }, 'Get related books successfully');
   }
 }

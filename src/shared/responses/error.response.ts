@@ -4,7 +4,6 @@ import { BaseResponse } from './base.response';
 export interface ErrorDetail {
   field?: string;
   message: string;
-  code?: string;
 }
 
 export interface ErrorData {
