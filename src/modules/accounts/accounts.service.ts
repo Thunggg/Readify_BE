@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { Model, Types, type QueryFilter } from 'mongoose';
+import { Model, PipelineStage, Types, type QueryFilter } from 'mongoose';
 import { Account, AccountDocument } from './schemas/account.schema';
 import { RegisterAccountDto } from './dto/register-account.dto';
 import { ConfigService } from '@nestjs/config';
@@ -390,7 +390,7 @@ export class AccountsService {
         $in: [AccountRole.USER],
         $ne: AccountRole.ADMIN,
       },
-      status: { $ne: AccountStatus.BANNED },
+      isDeleted: { $ne: true },
     };
 
     if (isDeleted === true) filter.isDeleted = true;
@@ -413,34 +413,52 @@ export class AccountsService {
     }
 
     // SORT
-    const sortMap: Record<string, Record<string, 1 | -1>> = {
-      createdAt: { createdAt: order === 'asc' ? 1 : -1 },
-      email: { email: order === 'asc' ? 1 : -1 },
-      firstName: {
-        firstName: order === 'asc' ? 1 : -1,
-        lastName: order === 'asc' ? 1 : -1,
-      },
-      lastName: {
-        lastName: order === 'asc' ? 1 : -1,
-        firstName: order === 'asc' ? 1 : -1,
-      },
-      lastLoginAt: { lastLoginAt: order === 'asc' ? 1 : -1 },
-    };
+    const aggregationPipeline: PipelineStage[] = [{ $match: filter }];
 
-    const sort: Record<string, 1 | -1> = {
-      ...(sortMap[sortBy] ?? { createdAt: -1 }),
-      _id: 1,
-    };
+    // Thêm fullName field nếu cần sort theo fullName hoặc cần trả về
+    if (sortBy === StaffSortBy.FULL_NAME) {
+      aggregationPipeline.push({
+        $addFields: {
+          fullName: {
+            $concat: [{ $ifNull: ['$firstName', ''] }, ' ', { $ifNull: ['$lastName', ''] }],
+          },
+        },
+      });
+    }
+
+    const sortOrder = order === SortOrder.ASC ? 1 : -1;
+    let sortStage: any = { _id: 1 };
+
+    if (sortBy === StaffSortBy.FULL_NAME) {
+      sortStage = { fullName: sortOrder };
+    } else {
+      const sortMap: Record<string, any> = {
+        createdAt: { createdAt: sortOrder },
+        email: { email: sortOrder },
+        firstName: { firstName: sortOrder, lastName: sortOrder },
+        lastName: { lastName: sortOrder, firstName: sortOrder },
+        lastLoginAt: { lastLoginAt: sortOrder },
+        dateOfBirth: { dateOfBirth: sortOrder },
+      };
+
+      sortStage = { ...(sortMap[sortBy] || { createdAt: -1 }), _id: 1 };
+    }
+
+    aggregationPipeline.push({ $sort: sortStage });
+
+    // Thêm pagination
+    aggregationPipeline.push({ $skip: skip }, { $limit: validLimit });
+
+    // Project để loại bỏ password
+    aggregationPipeline.push({
+      $project: {
+        password: 0,
+      },
+    });
 
     // QUERY
     const [items, total] = await Promise.all([
-      this.accountModel
-        .find(filter)
-        .sort(sort as Parameters<ReturnType<Model<AccountDocument>['find']>['sort']>[0])
-        .skip(skip)
-        .limit(validLimit)
-        .select({ password: 0 })
-        .lean(),
+      this.accountModel.aggregate(aggregationPipeline),
       this.accountModel.countDocuments(filter),
     ]);
 
