@@ -4,10 +4,6 @@ import { NotificationType } from '../enums/notification-type.enum';
 import { NotificationMetadataDto } from './notification-metadata.dto';
 
 export class CreateNotificationDto {
-  @IsOptional()
-  @IsMongoId()
-  userId?: string;
-
   @IsString()
   @IsNotEmpty({ message: 'Title is required' })
   @MinLength(1, { message: 'Title must be at least 1 character long' })

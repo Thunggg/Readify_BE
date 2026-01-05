@@ -164,6 +164,8 @@ export class BooksAdminService {
         tags: 1,
         stockOnHand: 1,
         stockReserved: 1,
+        ratingAvg: 1,
+        ratingCount: 1,
         createdAt: 1,
         updatedAt: 1,
       })
@@ -212,6 +214,8 @@ export class BooksAdminService {
         tags: 1,
         stockOnHand: 1,
         stockReserved: 1,
+        ratingAvg: 1,
+        ratingCount: 1,
         createdAt: 1,
         updatedAt: 1,
       })

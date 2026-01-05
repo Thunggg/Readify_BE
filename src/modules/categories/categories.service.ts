@@ -18,6 +18,14 @@ export class CategoriesService {
   async createCategory(dto: CreateCategoryDto) {
     const name = dto.name.trim();
 
+    // Check if name is empty after trim
+    if (!name) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'name', message: 'Category name cannot be empty' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     // Check if category name already exists
     const existingCategory = await this.categoryModel.findOne({
       name: { $regex: new RegExp(`^${name}$`, 'i') }, // Case-insensitive
@@ -169,6 +177,15 @@ export class CategoriesService {
     // Check if new name already exists (if name is being updated)
     if (dto.name !== undefined) {
       const newName = dto.name.trim();
+      
+      // Check if name is empty after trim
+      if (!newName) {
+        throw new HttpException(
+          ErrorResponse.validationError([{ field: 'name', message: 'Category name cannot be empty' }]),
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       const existingCategory = await this.categoryModel.findOne({
         name: { $regex: new RegExp(`^${newName}$`, 'i') },
         _id: { $ne: category._id },

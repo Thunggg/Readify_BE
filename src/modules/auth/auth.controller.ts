@@ -30,7 +30,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(@Req() req: { user: { userId: string }; cookies: { accessToken?: string } }, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: { cookies: { accessToken?: string } }, @Res({ passthrough: true }) res: Response) {
     const response = await this.authService.logout(req?.cookies?.accessToken as string);
     res.clearCookie('accessToken');
     return response;

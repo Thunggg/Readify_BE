@@ -7,7 +7,7 @@ export type NotificationDocument = HydratedDocument<Notification>;
 @Schema({ timestamps: true })
 export class Notification {
   @Prop({ type: Types.ObjectId, ref: 'Account', required: true, index: true })
-  userId: Types.ObjectId;
+  createdBy: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
   title: string;
@@ -39,8 +39,8 @@ export class Notification {
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
 
 // Indexes for performance
-NotificationSchema.index({ userId: 1, createdAt: -1 });
-NotificationSchema.index({ userId: 1, type: 1, createdAt: -1 });
+NotificationSchema.index({ createdBy: 1, createdAt: -1 });
+NotificationSchema.index({ createdBy: 1, type: 1, createdAt: -1 });
 NotificationSchema.index({ isActive: 1, createdAt: -1 });
 
 

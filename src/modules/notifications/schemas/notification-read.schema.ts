@@ -13,6 +13,12 @@ export class NotificationRead {
 
   @Prop({ type: Date, default: Date.now })
   readAt: Date;
+
+  @Prop({ default: false })
+  isDeleted: boolean;
+
+  @Prop()
+  deletedAt?: Date;
 }
 
 export const NotificationReadSchema = SchemaFactory.createForClass(NotificationRead);

@@ -20,19 +20,19 @@ export class NotificationsService {
     private readonly notificationReadModel: Model<NotificationReadDocument>,
   ) {}
 
-  async createNotification(dto: CreateNotificationDto, currentUserId?: string) {
-    // Validate that we have a userId from either dto or currentUserId
-    if (!dto.userId && !currentUserId) {
+  async createNotification(dto: CreateNotificationDto, currentUserId: string) {
+    // Validate currentUserId
+    if (!currentUserId) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'userId', message: 'User ID is required' }]),
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    const userId = dto.userId ? new Types.ObjectId(dto.userId) : new Types.ObjectId(currentUserId);
+    const createdBy = new Types.ObjectId(currentUserId);
 
     const notification = await this.notificationModel.create({
-      userId,
+      createdBy,
       title: dto.title.trim(),
       content: dto.content.trim(),
       type: dto.type || 'SYSTEM',
