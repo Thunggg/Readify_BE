@@ -9,7 +9,14 @@ import { comparePassword, hashPassword } from 'src/shared/utils/bcrypt';
 import { SuccessResponse } from 'src/shared/responses/success.response';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
 import { CreateAccountDto } from './dto/create-account.dto';
-import { AccountRole, AccountStatus, SortOrder, StaffSortBy } from '../staff/constants/staff.enum';
+import {
+  AccountRole,
+  AccountStatus,
+  AccountStatusValue,
+  SortOrder,
+  SortOrderValue,
+  StaffSortBy,
+} from '../staff/constants/staff.enum';
 import { UpdateAccountDto } from './dto/edit-account.dto';
 import { SearchAccountDto } from './dto/search-account.dto';
 import { ForgotPasswordRequestDto } from './dto/forgot-password.dto';
@@ -368,6 +375,94 @@ export class AccountsService {
     return new SuccessResponse(account, 'Get account detail successfully', 200);
   }
 
+  private buildAccountFileter(param: { q?: string; status?: AccountStatusValue; isDeleted?: boolean }) {
+    const { q, status, isDeleted } = param;
+
+    const filter: QueryFilter<AccountDocument> = {
+      role: {
+        $in: [AccountRole.USER],
+        $ne: AccountRole.ADMIN,
+      },
+    };
+
+    // Xử lý trạng thái isDeleted
+    if (isDeleted === true) {
+      filter.isDeleted = true;
+    } else {
+      filter.isDeleted = { $ne: true };
+    }
+
+    // Filter theo status
+    if (status !== undefined) {
+      filter.status = status;
+    }
+
+    //Filter theo từ khóa tìm kiếm
+    if (q) {
+      // value	Boolean(value) => true nếu value không phải là falsey (false, 0, null, undefined, NaN, "")
+      const searchKeywords = q.trim().split(/\s+/).filter(Boolean).slice(0, 5); // Tách chuỗi thành các từ khóa riêng lẻ, tối đa 5 từ
+      const searchFields = ['firstName', 'lastName', 'email', 'phone'] as const;
+
+      filter.$and = searchKeywords.map((kw) => ({
+        $or: searchFields.map((f) => ({
+          [f]: { $regex: kw, $options: 'i' },
+        })),
+      }));
+    }
+
+    return filter;
+  }
+
+  // xây dựng sort stage
+  private buildSortStage(sortBy: string, order: SortOrderValue): PipelineStage {
+    const sortOrder = order === SortOrder.ASC ? 1 : -1;
+
+    // Map các trường sort với hướng sort tương ứng
+    const sortMap: Record<string, Record<string, 1 | -1>> = {
+      [StaffSortBy.CREATED_AT]: { createdAt: sortOrder },
+      [StaffSortBy.EMAIL]: { email: sortOrder },
+      [StaffSortBy.LAST_LOGIN_AT]: { lastLoginAt: sortOrder },
+      [StaffSortBy.DATE_OF_BIRTH]: { dateOfBirth: sortOrder },
+      [StaffSortBy.FULL_NAME]: { fullName: sortOrder },
+    };
+
+    // Lấy sort stage từ map, mặc định sort theo CREATED_AT
+    const sortStage = sortMap[sortBy] || { createdAt: -1 };
+
+    return { $sort: { ...sortStage, _id: 1 } };
+  }
+
+  private buildAggregationPipeline(params: {
+    filter: QueryFilter<AccountDocument>;
+    sortBy: string;
+    order: SortOrderValue;
+    skip: number;
+    limit: number;
+  }): PipelineStage[] {
+    const { filter, sortBy, order, skip, limit } = params;
+    const pipeline: PipelineStage[] = [{ $match: filter }];
+
+    // Thêm fullName field ảo nếu cần sort theo fullName
+    if (sortBy === StaffSortBy.FULL_NAME) {
+      pipeline.push({
+        $addFields: {
+          fullName: {
+            $concat: [{ $ifNull: ['$firstName', ''] }, ' ', { $ifNull: ['$lastName', ''] }],
+          },
+        },
+      });
+    }
+
+    // xây dựng sort stage
+    const sortStage = this.buildSortStage(sortBy, order);
+    pipeline.push(sortStage);
+
+    // Thêm pagination
+    pipeline.push({ $skip: skip }, { $limit: limit });
+
+    return pipeline;
+  }
+
   async getAccountList(query: SearchAccountDto) {
     const {
       q,
@@ -385,76 +480,10 @@ export class AccountsService {
     const skip = (validPage - 1) * validLimit;
 
     // FILTER
-    const filter: QueryFilter<AccountDocument> = {
-      role: {
-        $in: [AccountRole.USER],
-        $ne: AccountRole.ADMIN,
-      },
-      isDeleted: { $ne: true },
-    };
-
-    if (isDeleted === true) filter.isDeleted = true;
-    else filter.isDeleted = { $ne: true };
-
-    if (status !== undefined) {
-      filter.status = status;
-    }
-
-    if (q) {
-      const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
-
-      const fields = ['firstName', 'lastName', 'email', 'phone'] as const;
-
-      filter.$and = tokens.map((kw) => ({
-        $or: fields.map((f) => ({
-          [f]: { $regex: kw, $options: 'i' },
-        })),
-      }));
-    }
+    const filter = this.buildAccountFileter({ q, status, isDeleted });
 
     // SORT
-    const aggregationPipeline: PipelineStage[] = [{ $match: filter }];
-
-    // Thêm fullName field nếu cần sort theo fullName hoặc cần trả về
-    if (sortBy === StaffSortBy.FULL_NAME) {
-      aggregationPipeline.push({
-        $addFields: {
-          fullName: {
-            $concat: [{ $ifNull: ['$firstName', ''] }, ' ', { $ifNull: ['$lastName', ''] }],
-          },
-        },
-      });
-    }
-
-    const sortOrder = order === SortOrder.ASC ? 1 : -1;
-    let sortStage: any = { _id: 1 };
-
-    if (sortBy === StaffSortBy.FULL_NAME) {
-      sortStage = { fullName: sortOrder };
-    } else {
-      const sortMap: Record<string, any> = {
-        createdAt: { createdAt: sortOrder },
-        email: { email: sortOrder },
-        firstName: { firstName: sortOrder, lastName: sortOrder },
-        lastName: { lastName: sortOrder, firstName: sortOrder },
-        lastLoginAt: { lastLoginAt: sortOrder },
-        dateOfBirth: { dateOfBirth: sortOrder },
-      };
-
-      sortStage = { ...(sortMap[sortBy] || { createdAt: -1 }), _id: 1 };
-    }
-
-    aggregationPipeline.push({ $sort: sortStage });
-
-    // Thêm pagination
-    aggregationPipeline.push({ $skip: skip }, { $limit: validLimit });
-
-    // Project để loại bỏ password
-    aggregationPipeline.push({
-      $project: {
-        password: 0,
-      },
-    });
+    const aggregationPipeline = this.buildAggregationPipeline({ filter, sortBy, order, skip, limit: validLimit });
 
     // QUERY
     const [items, total] = await Promise.all([
@@ -464,11 +493,7 @@ export class AccountsService {
 
     return new PaginatedResponse(
       items,
-      {
-        page: validPage,
-        limit: validLimit,
-        total,
-      },
+      { page: validPage, limit: validLimit, total },
       'Account list retrieved successfully',
     );
   }
