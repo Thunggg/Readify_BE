@@ -3,10 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Book } from '../schemas/book.schema';
 import { SearchPublicBooksDto } from '../dto/search-public-books.dto';
-import { ApiResponse } from '../../../shared/responses/api-response';
 import { ErrorResponse } from '../../../shared/responses/error.response';
 import { SortOrder } from 'mongoose';
 import { SearchBookSuggestionsDto } from '../dto/search-book-suggestions.dto';
+import { PaginatedResponse } from '../../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../../shared/responses/success.response';
 
 @Injectable()
 export class BooksPublicService {
@@ -21,7 +22,7 @@ export class BooksPublicService {
     // ===== base filter (public) =====
     const filter: Record<string, any> = {
       isDeleted: false,
-      status: 1, // published / active
+      status: 1,
     };
 
     // ===== category filter =====
@@ -40,11 +41,6 @@ export class BooksPublicService {
       filter.basePrice = {};
       if (query.minPrice !== undefined) filter.basePrice.$gte = query.minPrice;
       if (query.maxPrice !== undefined) filter.basePrice.$lte = query.maxPrice;
-    }
-
-    // ===== stock filter =====
-    if (query.inStock === true) {
-      filter.stockOnHand = { $gt: 0 };
     }
 
     // ===== search =====
@@ -79,13 +75,9 @@ export class BooksPublicService {
           authors: 1,
           thumbnailUrl: 1,
           basePrice: 1,
-          originalPrice: 1,
           currency: 1,
-          averageRating: 1,
-          totalReviews: 1,
           soldCount: 1,
           categoryIds: 1,
-          stockOnHand: 1,
           createdAt: 1,
         })
         .sort(sort)
@@ -95,17 +87,9 @@ export class BooksPublicService {
       this.bookModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.success(
-      {
-        items,
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      'Get books list successfully',
-    );
+    return new PaginatedResponse(items, { page, limit, total }, 'Get books list successfully');
   }
+
 
   async getBookSuggestions(query: SearchBookSuggestionsDto) {
     const keyword = query.q?.trim();
@@ -113,7 +97,7 @@ export class BooksPublicService {
 
     // Không search khi keyword quá ngắn
     if (!keyword || keyword.length < 2) {
-      return ApiResponse.success({ items: [] });
+      return new SuccessResponse({ items: [] }, 'Get book suggestions successfully');
     }
 
     const items = await this.bookModel
@@ -137,7 +121,7 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items });
+    return new SuccessResponse({ items }, 'Get book suggestions successfully');
   }
 
   async getBookDetailById(id: string) {
@@ -165,12 +149,8 @@ export class BooksPublicService {
         images: 1,
         thumbnailUrl: 1,
         basePrice: 1,
-        originalPrice: 1,
         currency: 1,
-        averageRating: 1,
-        totalReviews: 1,
         soldCount: 1,
-        stockOnHand: 1,
         createdAt: 1,
       })
       // populate
@@ -182,7 +162,7 @@ export class BooksPublicService {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Get book detail successfully');
+    return new SuccessResponse(book, 'Get book detail successfully');
   }
 
   async getBookDetailBySlug(slug: string) {
@@ -211,12 +191,8 @@ export class BooksPublicService {
         images: 1,
         thumbnailUrl: 1,
         basePrice: 1,
-        originalPrice: 1,
         currency: 1,
-        averageRating: 1,
-        totalReviews: 1,
         soldCount: 1,
-        stockOnHand: 1,
         createdAt: 1,
       })
       // populate
@@ -228,7 +204,7 @@ export class BooksPublicService {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Get book detail successfully');
+    return new SuccessResponse(book, 'Get book detail successfully');
   }
 
   async getRelatedBooks(bookId: string, limitParam?: string) {
@@ -241,7 +217,7 @@ export class BooksPublicService {
 
     const limit = Math.min(Math.max(parseInt(limitParam ?? '8', 10) || 8, 1), 20);
 
-    // 1) Load current book (để lấy categoryIds/authors)
+    // Load current book (để lấy categoryIds/authors)
     const book = await this.bookModel
       .findOne({ _id: new Types.ObjectId(bookId), isDeleted: false, status: 1 })
       .select({ categoryIds: 1, authors: 1 })
@@ -277,10 +253,7 @@ export class BooksPublicService {
         authors: 1,
         thumbnailUrl: 1,
         basePrice: 1,
-        originalPrice: 1,
         currency: 1,
-        averageRating: 1,
-        totalReviews: 1,
         soldCount: 1,
         categoryIds: 1,
         createdAt: 1,
@@ -290,7 +263,7 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items }, 'Get related books successfully');
+    return new SuccessResponse({ items }, 'Get related books successfully');
   }
 
   async getRelatedBookBySlug(bookSlug: string, limitParam?: string) {
@@ -336,10 +309,7 @@ export class BooksPublicService {
         authors: 1,
         thumbnailUrl: 1,
         basePrice: 1,
-        originalPrice: 1,
         currency: 1,
-        averageRating: 1,
-        totalReviews: 1,
         soldCount: 1,
         categoryIds: 1,
         createdAt: 1,
@@ -348,6 +318,6 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items }, 'Get related books successfully');
+    return new SuccessResponse({ items }, 'Get related books successfully');
   }
 }

@@ -1,4 +1,14 @@
-import { IsDate, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsDate,
+  IsEmail,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateAccountDto {
@@ -10,7 +20,7 @@ export class UpdateAccountDto {
   @MaxLength(255, { message: 'Email must be less than 255 characters long' })
   email?: string;
 
-  @IsOptional()
+  @ValidateIf((o) => o.password !== undefined && o.password !== null && o.password !== '')
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password can not be empty' })
   @MinLength(6, { message: 'Password must be at least 6 characters long' })

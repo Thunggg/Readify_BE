@@ -6,9 +6,9 @@ import { EmailOtp, EmailOtpDocument } from './schemas/email-otp.schema';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { comparePassword, hashPassword } from 'src/shared/utils/bcrypt';
 import { ConfigService } from '@nestjs/config';
-import { ApiResponse } from 'src/shared/responses/api-response';
 import { ErrorResponse } from 'src/shared/responses/error.response';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Injectable()
 export class OtpService {
@@ -161,7 +161,7 @@ export class OtpService {
     const otp = this.makeOtp();
     const otpHash = await hashPassword(otp, this.configService.get<number>('bcrypt.saltRounds') as number);
     const expiresInMinutes = this.expiresInMinutes;
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000); // 5 phút
 
     const now = new Date();
     const displayDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -201,7 +201,7 @@ export class OtpService {
       throw new HttpException(ErrorResponse.internal('Failed to send OTP email'), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    return ApiResponse.success(null, 'OTP sent successfully', 200);
+    return new SuccessResponse(null, 'OTP sent successfully', 200);
   }
 
   async reSendOtp(dto: SendOtpDto) {
@@ -301,7 +301,7 @@ export class OtpService {
       throw new HttpException(ErrorResponse.internal('Failed to send OTP email'), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    return ApiResponse.success(null, 'OTP resent successfully', 200);
+    return new SuccessResponse(null, 'OTP resent successfully', 200);
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
@@ -349,6 +349,6 @@ export class OtpService {
     }
 
     await this.otpModel.deleteOne({ _id: record._id });
-    return ApiResponse.success(null, 'Verify OTP successfully', 200);
+    return new SuccessResponse(null, 'Verify OTP successfully', 200);
   }
 }

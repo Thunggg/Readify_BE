@@ -1,7 +1,7 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { CLOUDINARY } from './cloudinary.provider';
-import { ApiResponse } from 'src/shared/responses/api-response';
+import { ErrorResponse } from 'src/shared/responses/error.response';
 
 type CloudinaryV2 = typeof cloudinary;
 
@@ -28,7 +28,7 @@ export class CloudinaryService {
         },
         (err, result) => {
           if (err) {
-            return reject(new HttpException(ApiResponse.error('Upload failed', 'UPLOAD_FAILED', 500), 500));
+            return reject(new HttpException(new ErrorResponse('Upload failed', 'UPLOAD_FAILED', 500), 500));
           }
 
           resolve({

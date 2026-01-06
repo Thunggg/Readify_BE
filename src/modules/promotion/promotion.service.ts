@@ -14,16 +14,17 @@ import { SearchPromotionDto } from './dto/search-promotion.dto';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
 import { ApplyPromotionDto } from './dto/apply-promotion.dto';
-import { PromotionSortBy, SortOrder } from './constants/promotion.enum';
+import { PromotionSortBy, PromotionStatus, SortOrder } from './constants/promotion.enum';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 
-import { ApiResponse } from '../../shared/responses/api-response';
+import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class PromotionService {
-  private readonly ALLOWED_ROLES = [0, 1, 4, 3, 2]; // 0: user, 1: admin, 2: seller, 3: warehouse, 4: staff, 5: seller
-  private readonly ALLOWED_ROLES_M = [4, 2, 3]; // Admin, Warehouse, Seller
-  private readonly ALLOWED_ROLES_MUTATE = [4, 3, 2]; // Admin, Warehouse, Seller
+  private readonly ALLOWED_ROLES = [0, 1, 2, 3]; // 0: user, 1: admin, 2: seller, 3: warehouse manager
+  private readonly ALLOWED_ROLES_M = [1, 3, 2]; // Admin, Warehouse, Seller
+  private readonly ALLOWED_ROLES_MUTATE = [1, 3, 2]; // Admin, Warehouse, Seller
   constructor(
     @InjectModel(Promotion.name)
     private readonly promotionModel: Model<PromotionDocument>,
@@ -114,7 +115,7 @@ export class PromotionService {
       this.promotionModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -153,7 +154,7 @@ export class PromotionService {
       throw new NotFoundException('Promotion not found');
     }
 
-    return ApiResponse.success(promotion, 'Get promotion detail success');
+    return new SuccessResponse(promotion, 'Get promotion detail success');
   }
 
   async createPromotion(createDto: CreatePromotionDto, currentUser: string) {
@@ -195,7 +196,7 @@ export class PromotionService {
       ...createDto,
       code: createDto.code.toUpperCase(),
       createdBy: new Types.ObjectId(currentUser),
-      status: 'ACTIVE',
+      status: 'INACTIVE',
     });
 
     const promotion = await this.promotionModel
@@ -203,7 +204,7 @@ export class PromotionService {
       .populate('createdBy', 'firstName lastName email')
       .lean();
 
-    return ApiResponse.success(promotion, 'Promotion created successfully');
+    return new SuccessResponse(promotion, 'Promotion created successfully');
   }
 
   async updatePromotion(promotionId: string, updateDto: UpdatePromotionDto, currentUser: string) {
@@ -229,16 +230,46 @@ export class PromotionService {
       throw new NotFoundException('Promotion not found');
     }
 
-    if (updateDto.code && updateDto.code.toUpperCase() !== existingPromotion.code) {
-      const codeExists = await this.promotionModel
-        .findOne({
-          code: updateDto.code.toUpperCase(),
-          _id: { $ne: promotionId },
-        })
-        .lean();
+    const now = new Date();
 
-      if (codeExists) {
-        throw new ConflictException('Promotion code already exists');
+    // hệ thống tự động set status expired khi endDate < now
+    if (now > new Date(existingPromotion.endDate)) {
+      await this.promotionModel.updateOne({ _id: promotionId }, { $set: { status: PromotionStatus.EXPIRED } });
+      throw new BadRequestException('Promotion has expired');
+    }
+
+    // CODE: do not allow changing promo code after creation (it breaks user expectations/history)
+    if (updateDto.code && updateDto.code.toUpperCase() !== existingPromotion.code) {
+      throw new BadRequestException('Cannot change promotion code');
+    }
+
+    // START DATE: do not allow changing startDate after creation (history/validity issues)
+    if (
+      updateDto.startDate &&
+      new Date(updateDto.startDate).getTime() !== new Date(existingPromotion.startDate).getTime()
+    ) {
+      throw new BadRequestException('Cannot change promotion start date');
+    }
+
+    // If promotion is ACTIVE, already started, or has been used -> lock key commercial fields
+    const isRunningOrStarted =
+      existingPromotion.status === PromotionStatus.ACTIVE || now >= new Date(existingPromotion.startDate);
+    const isUsed = (existingPromotion.usedCount ?? 0) > 0;
+    if (isRunningOrStarted || isUsed) {
+      if (updateDto.discountType !== undefined && updateDto.discountType !== existingPromotion.discountType) {
+        throw new BadRequestException('Cannot change discount type while promotion is running/started/used');
+      }
+
+      if (updateDto.discountValue !== undefined && updateDto.discountValue !== existingPromotion.discountValue) {
+        throw new BadRequestException('Cannot change discount value while promotion is running/started/used');
+      }
+
+      if (updateDto.minOrderValue !== undefined && updateDto.minOrderValue !== existingPromotion.minOrderValue) {
+        throw new BadRequestException('Cannot change minimum order value while promotion is running/started/used');
+      }
+
+      if (updateDto.maxDiscount !== undefined && updateDto.maxDiscount !== existingPromotion.maxDiscount) {
+        throw new BadRequestException('Cannot change max discount while promotion is running/started/used');
       }
     }
 
@@ -251,9 +282,13 @@ export class PromotionService {
       }
     }
 
-    if (updateDto.discountValue !== undefined) {
-      const discountType = updateDto.discountType || existingPromotion.discountType;
-      if (discountType === 'PERCENT' && updateDto.discountValue > 100) {
+    // Validate the final (discountType, discountValue) after applying updates
+    // - If discountType becomes PERCENT, the effective discountValue must be <= 100
+    {
+      const finalDiscountType = updateDto.discountType ?? existingPromotion.discountType;
+      const finalDiscountValue = updateDto.discountValue ?? existingPromotion.discountValue;
+
+      if (finalDiscountType === 'PERCENT' && finalDiscountValue > 100) {
         throw new BadRequestException('Discount percentage cannot exceed 100%');
       }
     }
@@ -263,9 +298,8 @@ export class PromotionService {
       updatedBy: new Types.ObjectId(currentUser),
     };
 
-    if (updateDto.code) {
-      updateData.code = updateDto.code.toUpperCase();
-    }
+    // Do not update code (immutable); if provided and same, ignore it
+    if (updateDto.code) delete updateData.code;
 
     const updatedPromotion = await this.promotionModel
       .findByIdAndUpdate(promotionId, updateData, { new: true })
@@ -273,7 +307,7 @@ export class PromotionService {
       .populate('updatedBy', 'firstName lastName email')
       .lean();
 
-    return ApiResponse.success(updatedPromotion, 'Promotion updated successfully');
+    return new SuccessResponse(updatedPromotion, 'Promotion updated successfully');
   }
 
   async deletePromotion(promotionId: string, currentUser: string) {
@@ -303,9 +337,9 @@ export class PromotionService {
       throw new BadRequestException('Cannot delete promotion that has been used');
     }
 
-    await this.promotionModel.findByIdAndDelete(promotionId);
+    await this.promotionModel.updateOne({ _id: promotionId }, { $set: { isDeleted: true } });
 
-    return ApiResponse.success(null, 'Promotion deleted successfully');
+    return new SuccessResponse(null, 'Promotion deleted successfully');
   }
 
   async applyPromotion(applyDto: ApplyPromotionDto, currentUser: string) {
@@ -313,7 +347,7 @@ export class PromotionService {
       throw new BadRequestException('Invalid user id');
     }
 
-    const user = await this.accountModel.findById(currentUser).select('role').lean();
+    const user = await this.accountModel.findById(currentUser).select('role status').lean();
     if (!user) {
       throw new ForbiddenException('User not found');
     }
@@ -322,9 +356,14 @@ export class PromotionService {
       throw new ForbiddenException('Only customers can apply promotions');
     }
 
+    if (user.status !== 1) {
+      throw new ForbiddenException('Your account is not active');
+    }
+
     const promotion = await this.promotionModel
       .findOne({
         code: applyDto.code.toUpperCase(),
+        isDeleted: false,
       })
       .lean();
 
@@ -374,7 +413,9 @@ export class PromotionService {
 
     const finalAmount = applyDto.orderValue - discountAmount;
 
-    return ApiResponse.success(
+    await this.promotionModel.updateOne({ _id: promotion._id }, { $inc: { usedCount: 1 } });
+
+    return new SuccessResponse(
       {
         promotionCode: promotion.code,
         promotionName: promotion.name,
