@@ -20,6 +20,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { MailModule } from './modules/mail/mail.module';
 import { OtpModule } from './modules/otp/otp.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { OtpModule } from './modules/otp/otp.module';
     UploadsModule,
     MailModule,
     OtpModule,
+    WishlistModule,
   ],
   controllers: [AppController],
   providers: [AppService],
