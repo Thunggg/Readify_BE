@@ -36,3 +36,12 @@ export const SortOrder = {
 } as const;
 
 export type SortOrderValue = (typeof SortOrder)[keyof typeof SortOrder];
+
+// ===== SEX =====
+export const Sex = {
+  UNKNOWN: 0,
+  MALE: 1,
+  FEMALE: 2,
+} as const;
+
+export type SexValue = (typeof Sex)[keyof typeof Sex];

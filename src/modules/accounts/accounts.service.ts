@@ -13,6 +13,7 @@ import {
   AccountRole,
   AccountStatus,
   AccountStatusValue,
+  SexValue,
   SortOrder,
   SortOrderValue,
   StaffSortBy,
@@ -375,8 +376,13 @@ export class AccountsService {
     return new SuccessResponse(account, 'Get account detail successfully', 200);
   }
 
-  private buildAccountFileter(param: { q?: string; status?: AccountStatusValue; isDeleted?: boolean }) {
-    const { q, status, isDeleted } = param;
+  private buildAccountFileter(param: {
+    q?: string;
+    status?: AccountStatusValue[];
+    isDeleted?: boolean;
+    sex?: SexValue[];
+  }) {
+    const { q, status, isDeleted, sex } = param;
 
     const filter: QueryFilter<AccountDocument> = {
       role: {
@@ -392,9 +398,14 @@ export class AccountsService {
       filter.isDeleted = { $ne: true };
     }
 
-    // Filter theo status
-    if (status !== undefined) {
-      filter.status = status;
+    // Filter theo status (array)
+    if (status !== undefined && Array.isArray(status) && status.length > 0) {
+      filter.status = { $in: status };
+    }
+
+    // Filter theo sex (array)
+    if (sex !== undefined && Array.isArray(sex) && sex.length > 0) {
+      filter.sex = { $in: sex };
     }
 
     //Filter theo từ khóa tìm kiếm
@@ -413,7 +424,6 @@ export class AccountsService {
     return filter;
   }
 
-  // xây dựng sort stage
   private buildSortStage(sortBy: string, order: SortOrderValue): PipelineStage {
     const sortOrder = order === SortOrder.ASC ? 1 : -1;
 
@@ -467,6 +477,7 @@ export class AccountsService {
     const {
       q,
       status,
+      sex,
       isDeleted,
       sortBy = StaffSortBy.CREATED_AT,
       order = SortOrder.DESC,
@@ -480,7 +491,7 @@ export class AccountsService {
     const skip = (validPage - 1) * validLimit;
 
     // FILTER
-    const filter = this.buildAccountFileter({ q, status, isDeleted });
+    const filter = this.buildAccountFileter({ q, status, isDeleted, sex });
 
     // SORT
     const aggregationPipeline = this.buildAggregationPipeline({ filter, sortBy, order, skip, limit: validLimit });
