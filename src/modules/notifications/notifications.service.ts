@@ -47,8 +47,8 @@ export class NotificationsService {
     return ApiResponse.success(notificationData, 'Tạo thông báo thành công', 201);
   }
 
-  async getNotificationsList(query: ListNotificationsDto, currentUserId: string) {
-    const { type, isRead, page = 1, limit = 10 } = query;
+  async getNotificationsList(query: ListNotificationsDto, currentUserId: string, page: number = 1, limit: number = 10) {
+    const { type, isRead } = query;
 
     // PAGINATION
     const validPage = Math.max(1, page);
@@ -59,7 +59,7 @@ export class NotificationsService {
 
     // BASE FILTER
     const baseFilter: any = {
-      userId: currentUserIdObj,
+      createdBy: currentUserIdObj,
       isActive: true,
     };
 
@@ -128,7 +128,7 @@ export class NotificationsService {
         .populate('relatedPromotionId', 'code name')
         .select({
           _id: 1,
-          userId: 1,
+          createdBy: 1,
           title: 1,
           content: 1,
           type: 1,
@@ -188,14 +188,14 @@ export class NotificationsService {
     const notification = await this.notificationModel
       .findOne({
         _id: new Types.ObjectId(notificationId),
-        userId: new Types.ObjectId(currentUserId),
+        createdBy: new Types.ObjectId(currentUserId),
         isActive: true,
       })
       .populate('relatedOrderId', 'orderCode status totalAmount finalAmount')
       .populate('relatedPromotionId', 'code name discountType discountValue')
       .select({
         _id: 1,
-        userId: 1,
+        createdBy: 1,
         title: 1,
         content: 1,
         type: 1,
@@ -237,7 +237,7 @@ export class NotificationsService {
     return ApiResponse.success(notificationData, 'Lấy chi tiết thông báo thành công', 200);
   }
 
-  async updateNotification(notificationId: string, dto: UpdateNotificationDto, currentUserId: string) {
+  async updateNotification(notificationId: string, dto: UpdateNotificationDto, currentUserId: string, currentUserRole?: number) {
     // Validate notificationId
     if (!Types.ObjectId.isValid(notificationId)) {
       throw new HttpException(
@@ -248,9 +248,23 @@ export class NotificationsService {
 
     const notification = await this.notificationModel.findOne({
       _id: new Types.ObjectId(notificationId),
-      userId: new Types.ObjectId(currentUserId),
       isActive: true,
     });
+
+    if (!notification) {
+      throw new HttpException(
+        ErrorResponse.notFound('Notification not found'),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Check permission: user can only update their own notifications, admin can update any
+    const isAdmin = currentUserRole === AccountRole.ADMIN;
+    const isOwner = notification.createdBy.toString() === currentUserId;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException('You can only update your own notifications');
+    }
 
     if (!notification) {
       throw new HttpException(
@@ -326,7 +340,7 @@ export class NotificationsService {
 
     // Check permission: user can only delete their own notifications, admin can delete any
     const isAdmin = currentUserRole === AccountRole.ADMIN;
-    const isOwner = notification.userId.toString() === currentUserId;
+    const isOwner = notification.createdBy.toString() === currentUserId;
 
     if (!isAdmin && !isOwner) {
       throw new ForbiddenException('You can only delete your own notifications');
@@ -343,7 +357,7 @@ export class NotificationsService {
     // Get all unread notifications for this user
     const unreadNotifications = await this.notificationModel
       .find({
-        userId: new Types.ObjectId(currentUserId),
+        createdBy: new Types.ObjectId(currentUserId),
         isActive: true,
       })
       .select('_id')
@@ -410,7 +424,7 @@ export class NotificationsService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      baseFilter.userId = new Types.ObjectId(userId);
+      baseFilter.createdBy = new Types.ObjectId(userId);
     }
 
     if (type) {
@@ -475,12 +489,12 @@ export class NotificationsService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(validLimit)
-        .populate('userId', 'email firstName lastName')
+        .populate('createdBy', 'email firstName lastName')
         .populate('relatedOrderId', 'orderCode status totalAmount finalAmount')
         .populate('relatedPromotionId', 'code name discountType discountValue')
         .select({
           _id: 1,
-          userId: 1,
+          createdBy: 1,
           title: 1,
           content: 1,
           type: 1,
@@ -556,12 +570,12 @@ export class NotificationsService {
         _id: new Types.ObjectId(notificationId),
         isActive: true,
       })
-      .populate('userId', 'email firstName lastName role')
+      .populate('createdBy', 'email firstName lastName role')
       .populate('relatedOrderId', 'orderCode status totalAmount finalAmount')
       .populate('relatedPromotionId', 'code name discountType discountValue')
       .select({
         _id: 1,
-        userId: 1,
+        createdBy: 1,
         title: 1,
         content: 1,
         type: 1,
@@ -581,11 +595,11 @@ export class NotificationsService {
     }
 
     // Get read status for the notification owner
-    const userId = notification.userId as any;
-    if (userId && userId._id) {
+    const createdBy = notification.createdBy as any;
+    if (createdBy && createdBy._id) {
       const readRecord = await this.notificationReadModel.findOne({
         notificationId: new Types.ObjectId(notificationId),
-        userId: userId._id,
+        userId: createdBy._id,
       });
 
       const notificationData = {
@@ -606,6 +620,36 @@ export class NotificationsService {
       'Lấy chi tiết thông báo thành công',
       200,
     );
+  }
+
+  async deleteNotificationRead(notificationReadId: string, currentUserId: string) {
+    // Validate notificationReadId
+    if (!Types.ObjectId.isValid(notificationReadId)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid notification read ID' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const notificationRead = await this.notificationReadModel.findOne({
+      _id: new Types.ObjectId(notificationReadId),
+      userId: new Types.ObjectId(currentUserId),
+      isDeleted: { $ne: true },
+    });
+
+    if (!notificationRead) {
+      throw new HttpException(
+        ErrorResponse.notFound('Notification read record not found'),
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Soft delete
+    notificationRead.isDeleted = true;
+    notificationRead.deletedAt = new Date();
+    await notificationRead.save();
+
+    return ApiResponse.success({ _id: notificationReadId }, 'Xóa bản ghi đã đọc thành công', 200);
   }
 }
 
