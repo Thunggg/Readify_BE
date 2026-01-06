@@ -58,14 +58,15 @@ export class CreateBookDto {
   @IsString()
   currency?: string; // default VND
 
-  @IsMongoId()
-  coverMediaId: string;
-
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(10)
   @IsMongoId({ each: true })
-  galleryMediaIds?: string[];
+  images?: string[];
+
+  @IsOptional()
+  @IsString()
+  thumbnailUrl?: string;
 
   @IsOptional()
   @Type(() => Number)

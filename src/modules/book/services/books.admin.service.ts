@@ -159,6 +159,10 @@ export class BooksAdminService {
         createdAt: 1,
         updatedAt: 1,
       })
+      // populate
+      .populate('publisherId', 'name')
+      .populate('categoryIds', 'name slug')
+      .populate('images', 'url ')
       .lean();
 
     if (!book) {
@@ -314,10 +318,7 @@ export class BooksAdminService {
     }
 
     // Validate publisher (supplier) exists and is not deleted
-    const publisher = await this.supplierModel
-      .findById(dto.publisherId)
-      .select({ _id: 1, isDeleted: 1 })
-      .lean();
+    const publisher = await this.supplierModel.findById(dto.publisherId).select({ _id: 1, isDeleted: 1 }).lean();
 
     if (!publisher) {
       throw new HttpException(
@@ -380,24 +381,16 @@ export class BooksAdminService {
       );
     }
 
-    if (!dto.coverMediaId || !Types.ObjectId.isValid(dto.coverMediaId)) {
-      throw new HttpException(
-        ErrorResponse.validationError([{ field: 'coverMediaId', message: 'Invalid coverMediaId' }]),
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const galleryMediaIds = (dto.galleryMediaIds ?? []).map((id) => {
+    // Validate images array if provided
+    const imageIds = (dto.images ?? []).map((id) => {
       if (!Types.ObjectId.isValid(id)) {
         throw new HttpException(
-          ErrorResponse.validationError([{ field: 'galleryMediaIds', message: `Invalid mediaId: ${id}` }]),
+          ErrorResponse.validationError([{ field: 'images', message: `Invalid mediaId: ${id}` }]),
           HttpStatus.BAD_REQUEST,
         );
       }
-      return id;
+      return new Types.ObjectId(id);
     });
-
-    const allMediaIds = [dto.coverMediaId, ...galleryMediaIds].map((id) => new Types.ObjectId(id));
 
     // ===== transaction =====
     const session = await this.connection.startSession();
@@ -406,29 +399,28 @@ export class BooksAdminService {
       let createdBook: any;
 
       await session.withTransaction(async () => {
-        // 1) load medias (within tx) + validate count
-        const medias = await this.mediaModel
-          .find({ _id: { $in: allMediaIds } })
-          .select({ _id: 1, url: 1, status: 1, uploadedBy: 1 })
-          .session(session)
-          .lean();
+        // 1) load medias (within tx) + validate if images provided
+        let thumbnailUrl = dto.thumbnailUrl;
 
-        if (medias.length !== allMediaIds.length) {
-          throw new HttpException(
-            ErrorResponse.validationError([{ field: 'mediaIds', message: 'One or more media not found' }]),
-            HttpStatus.BAD_REQUEST,
-          );
+        if (imageIds.length > 0) {
+          const medias = await this.mediaModel
+            .find({ _id: { $in: imageIds } })
+            .select({ _id: 1, url: 1, status: 1, uploadedBy: 1 })
+            .session(session)
+            .lean();
+
+          if (medias.length !== imageIds.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'images', message: 'One or more media not found' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          // If thumbnailUrl not provided, use first image URL
+          if (!thumbnailUrl && medias.length > 0) {
+            thumbnailUrl = medias[0].url;
+          }
         }
-
-        const cover = medias.find((m) => String(m._id) === dto.coverMediaId);
-        if (!cover) {
-          throw new HttpException(
-            ErrorResponse.validationError([{ field: 'coverMediaId', message: 'Cover media not found' }]),
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        const gallery = galleryMediaIds.map((id) => medias.find((m) => String(m._id) === id)!);
 
         const bookPayload = {
           title: dto.title?.trim(),
@@ -442,17 +434,10 @@ export class BooksAdminService {
           isbn: dto.isbn?.trim(),
           publisherId: new Types.ObjectId(dto.publisherId),
           categoryIds,
-          images: [
-            { kind: 'cover' as const, mediaId: cover._id, url: cover.url },
-            ...gallery.map((m) => ({
-              kind: 'gallery' as const,
-              mediaId: m._id,
-              url: m.url,
-            })),
-          ],
+          images: imageIds,
+          thumbnailUrl: thumbnailUrl,
           basePrice: dto.basePrice,
           currency: dto.currency?.trim() || 'VND',
-          thumbnailUrl: cover.url,
           status: dto.status ?? 1,
           tags: dto.tags ?? [],
           isDeleted: false,
@@ -472,25 +457,18 @@ export class BooksAdminService {
 
         await new this.stockModel(stockPayload).save({ session });
 
-        // attach medias -> Book
-        const attachRes = await this.mediaModel.updateMany(
-          { _id: { $in: allMediaIds }, status: 'TEMP' },
-          {
-            $set: {
-              status: 'ATTACHED',
-              // attachedTo: { model: 'Book', id: book._id },
+        // attach medias -> Book (if any images provided)
+        if (imageIds.length > 0) {
+          await this.mediaModel.updateMany(
+            { _id: { $in: imageIds }, status: 'TEMP' },
+            {
+              $set: {
+                status: 'ATTACHED',
+              },
             },
-          },
-          { session },
-        );
-
-        // Nếu vì lý do nào đó không update đủ (race condition), thì throw để rollback
-        // if ((attachRes.modifiedCount ?? 0) !== allMediaIds.length) {
-        //   throw new HttpException(
-        //     ErrorResponse.validationError([{ field: 'mediaIds', message: 'Attach media failed' }]),
-        //     HttpStatus.CONFLICT,
-        //   );
-        // }
+            { session },
+          );
+        }
       });
 
       return ApiResponse.success(createdBook, 'Book created successfully');
@@ -664,65 +642,30 @@ export class BooksAdminService {
         const detachIds = new Set<string>();
 
         // 4a) Remove images
-        if (dto.removeMediaIds?.length) {
-          const removeIds = dto.removeMediaIds.map((id) => {
+        if (dto.removeImages?.length) {
+          const removeIds = dto.removeImages.map((id) => {
             if (!Types.ObjectId.isValid(id)) {
               throw new HttpException(
-                ErrorResponse.validationError([{ field: 'removeMediaIds', message: `Invalid mediaId: ${id}` }]),
+                ErrorResponse.validationError([{ field: 'removeImages', message: `Invalid mediaId: ${id}` }]),
                 HttpStatus.BAD_REQUEST,
               );
             }
             return String(id);
           });
 
-          currentImages = currentImages.filter((img) => {
-            const shouldRemove = removeIds.includes(String(img.mediaId));
-            if (shouldRemove) detachIds.add(String(img.mediaId));
+          currentImages = currentImages.filter((imgId) => {
+            const shouldRemove = removeIds.includes(String(imgId));
+            if (shouldRemove) detachIds.add(String(imgId));
             return !shouldRemove;
           });
         }
 
-        // 4b) Replace cover
-        if (dto.coverMediaId) {
-          if (!Types.ObjectId.isValid(dto.coverMediaId)) {
-            throw new HttpException(
-              ErrorResponse.validationError([{ field: 'coverMediaId', message: 'Invalid coverMediaId' }]),
-              HttpStatus.BAD_REQUEST,
-            );
-          }
-
-          const newCover = await this.mediaModel
-            .findById(dto.coverMediaId)
-            .select({ _id: 1, url: 1, status: 1, uploadedBy: 1 })
-            .session(session);
-
-          if (!newCover || newCover.status !== MediaStatus.TEMP) {
-            throw new HttpException(
-              ErrorResponse.validationError([{ field: 'coverMediaId', message: 'Cover media is invalid' }]),
-              HttpStatus.BAD_REQUEST,
-            );
-          }
-
-          if (staffId && String(newCover.uploadedBy) !== staffId) {
-            throw new HttpException(ErrorResponse.forbidden('You do not own this media'), HttpStatus.FORBIDDEN);
-          }
-
-          const oldCover = currentImages.find((img) => img.kind === 'cover');
-          if (oldCover) detachIds.add(String(oldCover.mediaId));
-
-          currentImages = currentImages.filter((img) => img.kind !== 'cover');
-          currentImages.unshift({ kind: 'cover', mediaId: newCover._id, url: newCover.url });
-
-          attachIds.add(String(newCover._id));
-          book.thumbnailUrl = newCover.url;
-        }
-
-        // 4c) Add gallery
-        if (dto.addGalleryMediaIds?.length) {
-          const addIds = dto.addGalleryMediaIds.map((id) => {
+        // 4b) Add new images
+        if (dto.addImages?.length) {
+          const addIds = dto.addImages.map((id) => {
             if (!Types.ObjectId.isValid(id)) {
               throw new HttpException(
-                ErrorResponse.validationError([{ field: 'addGalleryMediaIds', message: `Invalid mediaId: ${id}` }]),
+                ErrorResponse.validationError([{ field: 'addImages', message: `Invalid mediaId: ${id}` }]),
                 HttpStatus.BAD_REQUEST,
               );
             }
@@ -734,24 +677,26 @@ export class BooksAdminService {
             .select({ _id: 1, url: 1, status: 1, uploadedBy: 1 })
             .session(session);
 
-          if (medias.length !== addIds.length || medias.some((m) => m.status !== MediaStatus.TEMP)) {
-            throw new HttpException(
-              ErrorResponse.validationError([{ field: 'addGalleryMediaIds', message: 'Invalid gallery media' }]),
-              HttpStatus.BAD_REQUEST,
-            );
-          }
+          // if (medias.length !== addIds.length || medias.some((m) => m.status !== MediaStatus.TEMP)) {
+          //   throw new HttpException(
+          //     ErrorResponse.validationError([{ field: 'addImages', message: 'Invalid media' }]),
+          //     HttpStatus.BAD_REQUEST,
+          //   );
+          // }
 
-          const existed = new Set(currentImages.map((i) => String(i.mediaId)));
+          const existed = new Set(currentImages.map((i) => String(i)));
 
           for (const m of medias) {
-            if (staffId && String(m.uploadedBy) !== staffId) {
-              throw new HttpException(ErrorResponse.forbidden('You do not own this media'), HttpStatus.FORBIDDEN);
-            }
             if (!existed.has(String(m._id))) {
-              currentImages.push({ kind: 'gallery', mediaId: m._id, url: m.url });
+              currentImages.push(m._id);
               attachIds.add(String(m._id));
             }
           }
+        }
+
+        // 4c) Update thumbnailUrl if provided
+        if (dto.thumbnailUrl !== undefined) {
+          book.thumbnailUrl = dto.thumbnailUrl?.trim();
         }
 
         book.images = currentImages;
@@ -762,15 +707,15 @@ export class BooksAdminService {
         if (attachIds.size) {
           await this.mediaModel.updateMany(
             { _id: { $in: [...attachIds].map((id) => new Types.ObjectId(id)) }, status: 'TEMP' },
-            { $set: { status: 'ATTACHED', attachedTo: { model: 'Book', id: book._id } } },
+            { $set: { status: 'ATTACHED' } },
             { session },
           );
         }
 
         if (detachIds.size) {
           await this.mediaModel.updateMany(
-            { _id: { $in: [...detachIds].map((id) => new Types.ObjectId(id)) }, 'attachedTo.id': book._id },
-            { $set: { status: 'TEMP' }, $unset: { attachedTo: 1 } },
+            { _id: { $in: [...detachIds].map((id) => new Types.ObjectId(id)) } },
+            { $set: { status: 'TEMP' } },
             { session },
           );
         }
@@ -811,7 +756,6 @@ export class BooksAdminService {
           isDeleted: true,
           deletedAt: new Date(),
         };
-    
 
         await this.bookModel.updateOne({ _id: book._id }, { $set: updateData }, { session });
 
@@ -829,7 +773,7 @@ export class BooksAdminService {
       });
 
       return ApiResponse.success(null, 'Book deleted successfully');
-    } finally { 
+    } finally {
       session.endSession();
     }
   }
@@ -861,14 +805,14 @@ export class BooksAdminService {
         // Restore Book
         await this.bookModel.updateOne(
           { _id: book._id },
-          { 
+          {
             $set: { isDeleted: false },
-            $unset: { deletedAt: 1}
+            $unset: { deletedAt: 1 },
           },
-          { session }
+          { session },
         );
 
-        // Restore stock status 
+        // Restore stock status
         await this.stockModel.updateMany(
           { bookId: book._id },
           {

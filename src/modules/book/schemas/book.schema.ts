@@ -37,7 +37,7 @@ export class Book {
   isbn?: string;
 
   // Publisher (NXB)
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Supplier', required: true, index: true })
   publisherId: Types.ObjectId;
 
   // Categories (many-to-many) -> store ids array for easy filter
@@ -54,16 +54,11 @@ export class Book {
 
   // Media images
   @Prop({
-    type: [
-      {
-        kind: { type: String, enum: ['cover', 'gallery'], required: true },
-        mediaId: { type: Types.ObjectId, ref: 'Media', required: true },
-        url: { type: String, required: true },
-      },
-    ],
+    type: [{ type: Types.ObjectId, ref: 'Media' }],
     default: [],
   })
-  images: { kind: 'cover' | 'gallery'; mediaId: Types.ObjectId; url: string }[];
+  images: Types.ObjectId[];
+
 
   @Prop({ trim: true })
   thumbnailUrl?: string;

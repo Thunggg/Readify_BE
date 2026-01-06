@@ -89,15 +89,14 @@ export class BooksPublicService {
     return ApiResponse.paginated(items, { page, limit, total }, 'Get books list successfully');
   }
 
-
   async getBookSuggestions(query: SearchBookSuggestionsDto) {
     const keyword = query.q?.trim();
     const limit = Math.min(query.limit ?? 6, 10);
 
     // Không search khi keyword quá ngắn
-    if (!keyword || keyword.length < 2) {
-      return ApiResponse.success({ items: [] }, 'Get book suggestions successfully');
-    }
+    // if (!keyword || keyword.length < 2) {
+    //   return ApiResponse.success({ items: [] }, 'Get book suggestions successfully');
+    // }
 
     const items = await this.bookModel
       .find({
@@ -193,10 +192,13 @@ export class BooksPublicService {
         currency: 1,
         soldCount: 1,
         createdAt: 1,
+        tags: 1,
       })
-      // populate
-      .populate('publisherId', 'name')
+
       .populate('categoryIds', 'name slug')
+      .populate('publisherId', 'name')
+      .populate('images', 'url ')
+
       .lean();
 
     if (!book) {
@@ -317,6 +319,6 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return ApiResponse.success({ items }, 'Get related books successfully');
+    return ApiResponse.success( items , 'Get related books successfully');
   }
 }
