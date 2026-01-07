@@ -391,6 +391,10 @@ export class PromotionService {
       throw new BadRequestException('Promotion usage limit has been reached');
     }
 
+    if (promotion.usedByUsers && promotion.usedByUsers.some((id) => id.toString() === currentUser)) {
+      throw new BadRequestException('You have already used this promotion');
+    }
+
     if (applyDto.orderValue < promotion.minOrderValue) {
       throw new BadRequestException(`Minimum order value is ${promotion.minOrderValue}`);
     }
