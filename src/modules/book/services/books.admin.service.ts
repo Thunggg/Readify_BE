@@ -5,12 +5,14 @@ import { Book, BookDocument } from '../schemas/book.schema';
 import { SearchAdminBooksDto } from '../dto/search-admin-books.dto';
 import { CreateBookDto } from '../dto/create-book.dto';
 import { UpdateBookDto } from '../dto/update-book.dto';
-import { ApiResponse } from '../../../shared/responses/api-response';
+// use response classes directly
 import { ErrorResponse } from '../../../shared/responses/error.response';
 import { Stock } from 'src/modules/stock/schemas/stock.schema';
 import { Media, MediaStatus } from 'src/modules/media/schemas/media.schema';
 import { Category } from 'src/modules/categories/schemas/category.schema';
 import { Supplier } from 'src/modules/supplier/schemas/supplier.schema';
+import { PaginatedResponse } from 'src/shared/responses/paginated.response';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Injectable()
 export class BooksAdminService {
@@ -120,7 +122,7 @@ export class BooksAdminService {
       this.bookModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       { page: validPage, limit: validLimit, total },
       'Successfully retrieved the book list for the dashboard',
@@ -169,7 +171,7 @@ export class BooksAdminService {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Successfully retrieved the book by slug');
+    return new SuccessResponse(book, 'Successfully retrieved the book by slug');
   }
 
   async getDeletedBookBySlug(slug: string) {
@@ -212,7 +214,7 @@ export class BooksAdminService {
       throw new HttpException(ErrorResponse.notFound('Deleted book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Successfully retrieved the deleted book by slug');
+    return new SuccessResponse(book, 'Successfully retrieved the deleted book by slug');
   }
 
   // View book detail for dashboard
@@ -256,7 +258,7 @@ export class BooksAdminService {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(book, 'Successfully retrieved the book details for the dashboard');
+    return new SuccessResponse(book, 'Successfully retrieved the book details for the dashboard');
   }
 
   async addBook(dto: CreateBookDto, staffId?: string) {
@@ -471,7 +473,7 @@ export class BooksAdminService {
         }
       });
 
-      return ApiResponse.success(createdBook, 'Book created successfully');
+      return new SuccessResponse(createdBook, 'Book created successfully');
     } finally {
       session.endSession();
     }
@@ -721,7 +723,7 @@ export class BooksAdminService {
         }
       });
 
-      return ApiResponse.success(updatedBook, 'Book updated successfully');
+      return new SuccessResponse(updatedBook, 'Book updated successfully');
     } finally {
       session.endSession();
     }
@@ -772,8 +774,8 @@ export class BooksAdminService {
         );
       });
 
-      return ApiResponse.success(null, 'Book deleted successfully');
-    } finally {
+      return new SuccessResponse(null, 'Book deleted successfully');
+    } finally { 
       session.endSession();
     }
   }
@@ -825,7 +827,7 @@ export class BooksAdminService {
         );
       });
 
-      return ApiResponse.success(null, 'Book restored successfully');
+      return new SuccessResponse(null, 'Book restored successfully');
     } finally {
       session.endSession();
     }

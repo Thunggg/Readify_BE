@@ -7,8 +7,9 @@ import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { SearchSupplierDto } from './dto/search-supplier.dto';
 
-import { ApiResponse } from '../../shared/responses/api-response';
 import { ErrorResponse } from '../../shared/responses/error.response';
+import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class SupplierService {
@@ -87,7 +88,7 @@ export class SupplierService {
       this.supplierModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -126,7 +127,7 @@ export class SupplierService {
       throw new HttpException(ErrorResponse.notFound('Supplier not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(supplier, 'Successfully retrieved supplier details');
+    return new SuccessResponse(supplier, 'Successfully retrieved supplier details');
   }
 
   async createSupplier(dto: CreateSupplierDto) {
@@ -165,7 +166,7 @@ export class SupplierService {
       updatedAt: (created as any).updatedAt,
     };
 
-    return ApiResponse.success(data, 'Successfully created supplier');
+    return new SuccessResponse(data, 'Successfully created supplier');
   }
 
   async updateSupplier(id: string, dto: UpdateSupplierDto) {
@@ -226,7 +227,7 @@ export class SupplierService {
       updatedAt: (saved as any).updatedAt,
     };
 
-    return ApiResponse.success(data, 'Successfully updated supplier');
+    return new SuccessResponse(data, 'Successfully updated supplier');
   }
 
   async deleteSupplier(id: string) {
@@ -249,12 +250,21 @@ export class SupplierService {
       );
     }
 
+    // Kiểm tra xem supplier có đang quản lý sách nào không
+    // Chỉ cho phép xóa supplier khi không còn sách liên kết
+    if (supplier.bookIds && supplier.bookIds.length > 0) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'bookIds', message: 'Cannot delete supplier with existing books' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     // SOFT DELETE - Xóa mềm (chỉ đánh dấu, không xóa khỏi database)
     // Lý do: Giữ lại dữ liệu để audit, có thể restore sau
     supplier.isDeleted = true;
     await supplier.save();
 
-    return ApiResponse.success({ _id: id }, 'Successfully deleted supplier');
+    return new SuccessResponse({ _id: id }, 'Successfully deleted supplier');
   }
 
   async restoreSupplier(id: string) {
@@ -282,6 +292,6 @@ export class SupplierService {
     supplier.isDeleted = false;
     await supplier.save();
 
-    return ApiResponse.success({ _id: id }, 'Successfully restored supplier');
+    return new SuccessResponse({ _id: id }, 'Successfully restored supplier');
   }
 }

@@ -15,8 +15,9 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { UpdateStaffStatusDto } from './dto/update-staff-status.dto';
 import { UpdateStaffRoleDto } from './dto/update-staff-role.dto';
 
-import { ApiResponse } from '../../shared/responses/api-response';
 import { ErrorResponse } from '../../shared/responses/error.response';
+import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 import { ConfigService } from '@nestjs/config';
 import { hashPassword } from 'src/shared/utils/bcrypt';
 
@@ -137,7 +138,7 @@ export class StaffService {
       this.accountModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -179,7 +180,7 @@ export class StaffService {
       throw new HttpException(ErrorResponse.notFound('Staff not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(staff, 'Staff details retrieved successfully');
+    return new SuccessResponse(staff, 'Staff details retrieved successfully');
   }
 
   async addStaff(dto: CreateStaffDto) {
@@ -244,7 +245,7 @@ export class StaffService {
       updatedAt: (created as any).updatedAt,
     };
 
-    return ApiResponse.success(data, 'Staff created successfully');
+    return new SuccessResponse(data, 'Staff created successfully');
   }
 
   // Edit Staff
@@ -332,7 +333,7 @@ export class StaffService {
       updatedAt: (saved as any).updatedAt,
     };
 
-    return ApiResponse.success(data, 'Staff updated successfully');
+    return new SuccessResponse(data, 'Staff updated successfully');
   }
 
   // Delete Staff (soft delete)
@@ -371,7 +372,7 @@ export class StaffService {
     staff.isDeleted = true;
     await staff.save();
 
-    return ApiResponse.success({ _id: id }, 'Staff deleted successfully');
+    return new SuccessResponse({ _id: id }, 'Staff deleted successfully');
   }
 
   async restoreStaff(id: string) {
@@ -408,7 +409,7 @@ export class StaffService {
     staff.isDeleted = false;
     await staff.save();
 
-    return ApiResponse.success({ _id: id }, 'Staff restored successfully');
+    return new SuccessResponse({ _id: id }, 'Staff restored successfully');
   }
 
   async updateStaffStatus(id: string, dto: UpdateStaffStatusDto) {
@@ -438,7 +439,7 @@ export class StaffService {
     staff.status = dto.status;
     await staff.save();
 
-    return ApiResponse.success({ _id: id, status: dto.status }, 'Staff status updated successfully');
+    return new SuccessResponse({ _id: id, status: dto.status }, 'Staff status updated successfully');
   }
 
   async updateStaffRole(id: string, dto: UpdateStaffRoleDto) {
@@ -482,6 +483,6 @@ export class StaffService {
     staff.role = dto.role;
     await staff.save();
 
-    return ApiResponse.success({ _id: id, role: dto.role }, 'Staff role updated successfully');
+    return new SuccessResponse({ _id: id, role: dto.role }, 'Staff role updated successfully');
   }
 }

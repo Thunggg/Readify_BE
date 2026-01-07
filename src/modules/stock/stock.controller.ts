@@ -1,10 +1,15 @@
-import { Controller, Get, Param, Post, UploadedFile, UseInterceptors, Res } from '@nestjs/common';
+import { Controller, Get, Param, Post, UploadedFile, UseInterceptors, Res, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { StockService } from './stock.service';
 import { StockIdDto } from './dto/stock-id.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
 
 @Controller('stocks')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(1, 3) // Admin = 1, Warehouse Staff = 3
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

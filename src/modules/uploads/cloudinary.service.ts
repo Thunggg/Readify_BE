@@ -1,7 +1,7 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
-import { ApiResponse } from 'src/shared/responses/api-response';
+import { ErrorResponse } from 'src/shared/responses/error.response';
 
 export const UploadType = {
   USER_AVATAR: 'user_avatar',
@@ -26,10 +26,10 @@ export class CloudinaryService {
   }
 
   async uploadImage(file: Express.Multer.File, type: UploadTypeValue) {
-    if (!file) throw new HttpException(ApiResponse.error('File is required', 'FILE_REQUIRED', 400), 400);
+    if (!file) throw new HttpException(new ErrorResponse('File is required', 'FILE_REQUIRED', 400), 400);
 
     if (!file.mimetype.startsWith('image/'))
-      throw new HttpException(ApiResponse.error('File is not an image', 'FILE_NOT_AN_IMAGE', 400), 400);
+      throw new HttpException(new ErrorResponse('File is not an image', 'FILE_NOT_AN_IMAGE', 400), 400);
 
     return new Promise<{ url: string; public_id: string }>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -39,7 +39,7 @@ export class CloudinaryService {
         },
         (error, result) => {
           if (error || !result)
-            reject(new HttpException(ApiResponse.error('Failed to upload image', 'FAILED_TO_UPLOAD_IMAGE', 500), 500));
+            reject(new HttpException(new ErrorResponse('Failed to upload image', 'FAILED_TO_UPLOAD_IMAGE', 500), 500));
           resolve({ url: result?.secure_url ?? '', public_id: result?.public_id ?? '' });
         },
       );

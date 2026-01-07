@@ -8,8 +8,8 @@ import { SearchPromotionLogDto } from './dto/search-promotion-log.dto';
 import { PromotionLogSortBy, SortOrder } from './constants/promotion-log.enum';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 
-import { ApiResponse } from '../../shared/responses/api-response';
 import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class PromotionLogService {
@@ -95,14 +95,11 @@ export class PromotionLogService {
       this.promotionLogModel.countDocuments(filter),
     ]);
 
-    const pagination = {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-
-    return ApiResponse.success(new PaginatedResponse(logs, pagination), 'Promotion logs retrieved successfully');
+    return new PaginatedResponse(
+      logs,
+      { total, page, limit },
+      'Promotion logs retrieved successfully',
+    );
   }
 
   async getPromotionLogDetail(logId: string, currentUser: string) {
@@ -129,7 +126,7 @@ export class PromotionLogService {
       throw new NotFoundException('Promotion log not found');
     }
 
-    return ApiResponse.success(log, 'Promotion log retrieved successfully');
+    return new SuccessResponse(log, 'Promotion log retrieved successfully');
   }
 
   async createLog(data: {
