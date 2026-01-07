@@ -30,11 +30,13 @@ export class UpdateAccountDto {
   @IsOptional()
   @IsString({ message: 'First name must be a string' })
   @MaxLength(100, { message: 'First name must be less than 100 characters long' })
+  @MinLength(1, { message: 'First name can not be empty' })
   firstName?: string;
 
   @IsOptional()
   @IsString({ message: 'Last name must be a string' })
   @MaxLength(100, { message: 'Last name must be less than 100 characters long' })
+  @MinLength(1, { message: 'Last name can not be empty' })
   lastName?: string;
 
   @IsOptional()
@@ -45,17 +47,26 @@ export class UpdateAccountDto {
   @IsOptional()
   @IsString({ message: 'Phone must be a string' })
   @MaxLength(20, { message: 'Phone must be less than 20 characters long' })
+  @MinLength(1, { message: 'Phone can not be empty' })
   phone?: string;
 
   @IsOptional()
   @IsString({ message: 'Avatar URL must be a string' })
   @MaxLength(255, { message: 'Avatar URL must be less than 255 characters long' })
+  @MinLength(1, { message: 'Avatar URL can not be empty' })
   avatarUrl?: string;
 
   @IsOptional()
   @IsString({ message: 'Address must be a string' })
   @MaxLength(255, { message: 'Address must be less than 255 characters long' })
+  @MinLength(1, { message: 'Address can not be empty' })
   address?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Bio must be a string' })
+  @MaxLength(500, { message: 'Bio must be less than 500 characters long' })
+  @MinLength(1, { message: 'Bio can not be empty' })
+  bio?: string;
 
   // 1: active, 0: inactive, 2: not active email
   @IsOptional()
