@@ -212,13 +212,20 @@ export class AccountsService {
 
     if (dto.newPassword !== dto.confirmPassword) {
       throw new HttpException(
-        ErrorResponse.badRequest('New password and confirm password do not match'),
+        ErrorResponse.validationError([
+          { field: 'newPassword', message: 'New password and confirm password do not match' },
+        ]),
         HttpStatus.BAD_REQUEST,
       );
     }
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new HttpException(ErrorResponse.badRequest('New password must be different'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        ErrorResponse.validationError([
+          { field: 'newPassword', message: 'New password must be different from current password' },
+        ]),
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const account = await this.accountModel.findById(userId).select('+password');
@@ -239,7 +246,10 @@ export class AccountsService {
 
     const ok = await comparePassword(dto.currentPassword, account.password);
     if (!ok) {
-      throw new HttpException(ErrorResponse.badRequest('Current password is incorrect'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'currentPassword', message: 'Current password is incorrect' }]),
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     account.password = await hashPassword(dto.newPassword, Number(this.configService.get<number>('bcrypt.saltRounds')));
