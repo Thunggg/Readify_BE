@@ -7,8 +7,8 @@ import { validate } from 'class-validator';
 
 import { Stock, StockDocument } from './schemas/stock.schema';
 import { ImportStockRowDto, ImportStockResultDto } from './dto/import-stock.dto';
-import { ApiResponse } from '../../shared/responses/api-response';
 import { ErrorResponse } from '../../shared/responses/error.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class StockService {
@@ -53,7 +53,7 @@ export class StockService {
         },
       ]);
 
-      return ApiResponse.success(stocks, 'Lấy danh sách tồn kho thành công');
+      return new SuccessResponse(stocks, 'Lấy danh sách tồn kho thành công');
     } catch (err) {
       this.logger.error('Error fetching stock list: ' + String(err));
       throw new HttpException(
@@ -102,7 +102,7 @@ export class StockService {
         throw new HttpException(ErrorResponse.notFound('Stock not found'), HttpStatus.NOT_FOUND);
       }
 
-      return ApiResponse.success(stocks[0], 'Lấy chi tiết tồn kho thành công');
+      return new SuccessResponse(stocks[0], 'Lấy chi tiết tồn kho thành công');
     } catch (err) {
       if (err instanceof HttpException) throw err;
       this.logger.error('Error fetching stock detail: ' + String(err));

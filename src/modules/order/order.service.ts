@@ -10,9 +10,13 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderSortBy, SortOrder } from './constants/order.enum';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 import { Promotion, PromotionDocument } from '../promotion/schemas/promotion.schema';
+import { Cart, CartDocument } from '../cart/schemas/cart.schema';
+import { Book, BookDocument } from '../book/schemas/book.schema';
+import { Stock, StockDocument } from '../stock/schemas/stock.schema';
 import { PromotionLogService } from '../promotion-log/promotion-log.service';
 
-import { ApiResponse } from '../../shared/responses/api-response';
+import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class OrderService {
@@ -29,6 +33,12 @@ export class OrderService {
     private readonly accountModel: Model<AccountDocument>,
     @InjectModel(Promotion.name)
     private readonly promotionModel: Model<PromotionDocument>,
+    @InjectModel(Cart.name)
+    private readonly cartModel: Model<CartDocument>,
+    @InjectModel(Book.name)
+    private readonly bookModel: Model<BookDocument>,
+    @InjectModel(Stock.name)
+    private readonly stockModel: Model<StockDocument>,
     @InjectConnection()
     private readonly connection: Connection,
     private readonly promotionLogService: PromotionLogService,
@@ -114,7 +124,7 @@ export class OrderService {
       this.orderModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -159,183 +169,7 @@ export class OrderService {
       }
     }
 
-    return ApiResponse.success(order, 'Get order detail success');
-  }
-
-  async createOrder(createDto: CreateOrderDto, currentUser: string) {
-    if (!Types.ObjectId.isValid(currentUser)) {
-      throw new BadRequestException('Invalid user id');
-    }
-
-    const user = await this.accountModel.findById(currentUser).select('role').lean();
-    if (!user) {
-      throw new ForbiddenException('User not found');
-    }
-
-    if (!this.ALLOWED_ROLES_CREATE.includes(user.role)) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (!createDto.items || createDto.items.length === 0) {
-      throw new BadRequestException('Order must have at least one item');
-    }
-
-    if (createDto.totalAmount <= 0 || createDto.finalAmount <= 0) {
-      throw new BadRequestException('Invalid order amounts');
-    }
-
-    if (!createDto.shippingAddress || createDto.shippingAddress.trim().length < 10) {
-      throw new BadRequestException('Shipping address must be at least 10 characters');
-    }
-
-    let orderUserId: Types.ObjectId;
-
-    if (createDto.userId) {
-      if (user.role === 0) {
-        throw new ForbiddenException('Customer cannot create order for other users');
-      }
-
-      if (!Types.ObjectId.isValid(createDto.userId)) {
-        throw new BadRequestException('Invalid userId');
-      }
-
-      const targetUser = await this.accountModel.findById(createDto.userId).lean();
-      if (!targetUser) {
-        throw new NotFoundException('Target user not found');
-      }
-
-      orderUserId = new Types.ObjectId(createDto.userId);
-    } else {
-      orderUserId = new Types.ObjectId(currentUser);
-    }
-
-    const items = createDto.items.map((item) => {
-      if (!Types.ObjectId.isValid(item.bookId)) {
-        throw new BadRequestException(`Invalid bookId: ${item.bookId}`);
-      }
-
-      if (item.quantity <= 0) {
-        throw new BadRequestException(`Invalid quantity for ${item.title}`);
-      }
-
-      if (item.unitPrice < 0 || item.subtotal < 0) {
-        throw new BadRequestException(`Invalid price for ${item.title}`);
-      }
-
-      if (item.subtotal !== item.quantity * item.unitPrice) {
-        throw new BadRequestException(`Subtotal mismatch for ${item.title}`);
-      }
-
-      return {
-        ...item,
-        bookId: new Types.ObjectId(item.bookId),
-      };
-    });
-
-    const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    if (calculatedTotal !== createDto.totalAmount) {
-      throw new BadRequestException('Total amount does not match sum of items');
-    }
-
-    const expectedFinal = createDto.totalAmount - (createDto.discountAmount || 0);
-    if (Math.abs(expectedFinal - createDto.finalAmount) > 1) {
-      throw new BadRequestException('Final amount calculation is incorrect');
-    }
-
-    let promotionId: Types.ObjectId | undefined;
-    if (createDto.promotionId) {
-      if (!Types.ObjectId.isValid(createDto.promotionId)) {
-        throw new BadRequestException('Invalid promotionId');
-      }
-
-      const promotion = await this.promotionModel.findById(createDto.promotionId).lean();
-      if (!promotion) {
-        throw new NotFoundException('Promotion not found');
-      }
-
-      if (promotion.status !== 'ACTIVE') {
-        throw new BadRequestException('Promotion is not active');
-      }
-
-      const now = new Date();
-      const startDate = new Date(promotion.startDate);
-      const endDate = new Date(promotion.endDate);
-
-      if (now < startDate) {
-        throw new BadRequestException('Promotion has not started yet');
-      }
-
-      if (now > endDate) {
-        throw new BadRequestException('Promotion has expired');
-      }
-
-      if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) {
-        throw new BadRequestException('Promotion usage limit has been reached');
-      }
-
-      if (createDto.totalAmount < promotion.minOrderValue) {
-        throw new BadRequestException(`Minimum order value for this promotion is ${promotion.minOrderValue}`);
-      }
-
-      promotionId = new Types.ObjectId(createDto.promotionId);
-    }
-
-    const lastOrder = await this.orderModel.findOne().sort({ createdAt: -1 }).lean();
-    let orderCode = 'ORD20250001';
-
-    if (lastOrder && lastOrder.orderCode) {
-      const lastNumber = parseInt(lastOrder.orderCode.replace('ORD', ''));
-      const nextNumber = lastNumber + 1;
-      orderCode = `ORD${nextNumber.toString().padStart(8, '0')}`;
-    }
-
-    const newOrder = await this.orderModel.create({
-      orderCode,
-      userId: orderUserId,
-      items,
-      status: 'CREATED',
-      totalAmount: createDto.totalAmount,
-      discountAmount: createDto.discountAmount || 0,
-      finalAmount: createDto.finalAmount,
-      promotionId,
-      shippingAddress: createDto.shippingAddress,
-      paymentMethod: createDto.paymentMethod,
-      paymentStatus: 'UNPAID',
-      note: createDto.note,
-    });
-
-    if (promotionId) {
-      await this.promotionModel.findByIdAndUpdate(promotionId, {
-        $inc: { usedCount: 1 },
-      });
-
-      const promotionData = await this.promotionModel.findById(promotionId).lean();
-      if (promotionData) {
-        await this.promotionLogService.createLog({
-          promotionId: promotionId.toString(),
-          promotionCode: promotionData.code,
-          promotionName: promotionData.name,
-          action: 'APPLY',
-          performedBy: orderUserId.toString(),
-          newData: {
-            orderId: newOrder._id.toString(),
-            orderCode: orderCode,
-            discountAmount: createDto.discountAmount,
-            finalAmount: createDto.finalAmount,
-            totalAmount: createDto.totalAmount,
-          },
-          note: `Customer applied promotion ${promotionData.code} for order ${orderCode}`,
-        });
-      }
-    }
-
-    const order = await this.orderModel
-      .findById(newOrder._id)
-      .populate('userId', 'firstName lastName email phone')
-      .populate('promotionId', 'code name discountType discountValue')
-      .lean();
-
-    return ApiResponse.success(order, 'Order created successfully');
+    return new SuccessResponse(order, 'Get order detail success');
   }
 
   async updateOrder(orderId: string, updateDto: UpdateOrderDto, currentUser: string) {
@@ -361,58 +195,56 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    let promotionId: Types.ObjectId | undefined;
-    if (updateDto.promotionId) {
-      if (!Types.ObjectId.isValid(updateDto.promotionId)) {
-        throw new BadRequestException('Invalid promotionId');
+    const currentStatus = existingOrder.status;
+    const updateData: any = {};
+
+    if (updateDto.shippingAddress !== undefined) {
+      if (currentStatus !== 'PENDING') {
+        throw new BadRequestException('Shipping address can only be updated when order status is PENDING');
       }
+      updateData.shippingAddress = updateDto.shippingAddress;
+    }
 
-      const promotion = await this.promotionModel.findById(updateDto.promotionId).lean();
-      if (!promotion) {
-        throw new NotFoundException('Promotion not found');
-      }
+    if (updateDto.status !== undefined && updateDto.status !== currentStatus) {
+      if (existingOrder.paymentMethod === 'COD') {
+        const statusOrder = ['PENDING', 'CONFIRMED', 'DELIVERED', 'COMPLETED'];
+        const currentIndex = statusOrder.indexOf(currentStatus);
+        const newIndex = statusOrder.indexOf(updateDto.status);
 
-      promotionId = new Types.ObjectId(updateDto.promotionId);
-
-      if (existingOrder.promotionId?.toString() !== updateDto.promotionId) {
-        if (existingOrder.promotionId) {
-          await this.promotionModel.findByIdAndUpdate(existingOrder.promotionId, {
-            $inc: { usedCount: -1 },
-          });
+        if (updateDto.status === 'CANCELLED') {
+          if (currentStatus === 'COMPLETED') {
+            throw new BadRequestException('Cannot cancel completed order');
+          }
+          updateData.status = 'CANCELLED';
+        } else if (currentStatus === 'CANCELLED') {
+          throw new BadRequestException('Cannot change status of cancelled order');
+        } else if (currentIndex === -1 || newIndex === -1) {
+          throw new BadRequestException(`Invalid status transition from ${currentStatus} to ${updateDto.status}`);
+        } else if (newIndex !== currentIndex + 1) {
+          throw new BadRequestException(
+            `Invalid status transition. COD orders must follow sequence: PENDING → CONFIRMED → DELIVERED → COMPLETED. Cannot change from ${currentStatus} to ${updateDto.status}`,
+          );
+        } else {
+          updateData.status = updateDto.status;
         }
-
-        await this.promotionModel.findByIdAndUpdate(promotionId, {
-          $inc: { usedCount: 1 },
-        });
+      } else {
+        updateData.status = updateDto.status;
       }
     }
 
-    let items;
-    if (updateDto.items) {
-      items = updateDto.items.map((item) => {
-        if (!Types.ObjectId.isValid(item.bookId)) {
-          throw new BadRequestException(`Invalid bookId: ${item.bookId}`);
-        }
-        return {
-          ...item,
-          bookId: new Types.ObjectId(item.bookId),
-        };
-      });
+    const allowedFields = ['shippingAddress', 'status'];
+    const requestedFields = Object.keys(updateDto);
+    const invalidFields = requestedFields.filter((field) => !allowedFields.includes(field));
+
+    if (invalidFields.length > 0) {
+      throw new BadRequestException(
+        `Only shippingAddress and status can be updated. Invalid fields: ${invalidFields.join(', ')}`,
+      );
     }
 
-    const updateData: any = {
-      ...updateDto,
-    };
-
-    if (items) {
-      updateData.items = items;
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('No valid fields to update');
     }
-
-    if (promotionId) {
-      updateData.promotionId = promotionId;
-    }
-
-    delete updateData.userId;
 
     const updatedOrder = await this.orderModel
       .findByIdAndUpdate(orderId, updateData, { new: true })
@@ -420,7 +252,7 @@ export class OrderService {
       .populate('promotionId', 'code name discountType discountValue')
       .lean();
 
-    return ApiResponse.success(updatedOrder, 'Order updated successfully');
+    return new SuccessResponse(updatedOrder, 'Order updated successfully');
   }
 
   async getOrderHistory(query: SearchOrderDto, currentUser: string) {
@@ -504,7 +336,7 @@ export class OrderService {
       this.orderModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -546,44 +378,318 @@ export class OrderService {
       throw new BadRequestException('Order is already cancelled');
     }
 
-    if (order.status === 'DELIVERED' || order.status === 'RECEIVED') {
+    if (order.status === 'DELIVERED') {
       throw new BadRequestException('Cannot cancel order that has been delivered or received');
     }
 
-    if (order.paymentStatus === 'PAID') {
-      throw new BadRequestException('Cannot cancel order that has been paid. Please contact support for refund');
+    if (order.paymentMethod === 'COD') {
+      if (order.status !== 'PENDING') {
+        throw new BadRequestException('COD orders can only be cancelled when status is PENDING');
+      }
+    } else if (order.paymentMethod === 'VNPAY') {
+      if (order.paymentStatus === 'PAID') {
+        throw new BadRequestException(
+          'Cannot cancel VNPAY order that has been paid. Please contact support for refund',
+        );
+      }
     }
 
-    const cancelledOrder = await this.orderModel
-      .findByIdAndUpdate(
-        orderId,
-        {
-          status: 'CANCELLED',
-          paymentStatus: order.paymentStatus === 'UNPAID' ? 'UNPAID' : 'REFUNDED',
-        },
-        { new: true },
-      )
-      .populate('userId', 'firstName lastName email phone')
-      .populate('promotionId', 'code name discountType discountValue')
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      const cancelledOrder = await this.orderModel
+        .findByIdAndUpdate(
+          orderId,
+          {
+            status: 'CANCELLED',
+            paymentStatus: order.paymentStatus === 'UNPAID' ? 'UNPAID' : undefined,
+          },
+          { new: true, session },
+        )
+        .populate('userId', 'firstName lastName email phone')
+        .populate('promotionId', 'code name discountType discountValue')
+        .lean();
+
+      if (!cancelledOrder) {
+        throw new BadRequestException('Failed to cancel order');
+      }
+
+      const stockCollection = this.connection.db?.collection('stocks');
+      if (!stockCollection) {
+        throw new BadRequestException('Database connection error');
+      }
+
+      for (const item of order.items) {
+        const result = await stockCollection.updateOne(
+          { bookId: new Types.ObjectId(item.bookId as any) },
+          { $inc: { quantity: item.quantity } },
+          { session },
+        );
+
+        if (result.matchedCount === 0) {
+          throw new BadRequestException(`Stock not found for book ${item.bookId.toString()}`);
+        }
+      }
+
+      if (order.promotionId) {
+        const promotionResult = await this.promotionModel.findByIdAndUpdate(
+          order.promotionId,
+          {
+            $inc: { usedCount: -1 },
+            $pull: { usedByUsers: order.userId },
+          },
+          { session },
+        );
+
+        if (!promotionResult) {
+          throw new BadRequestException('Failed to update promotion usage');
+        }
+      }
+
+      await session.commitTransaction();
+
+      return new SuccessResponse(cancelledOrder, 'Order cancelled successfully');
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  async createOrder(createDto: CreateOrderDto, currentUser: string) {
+    if (!Types.ObjectId.isValid(currentUser)) {
+      throw new BadRequestException('Invalid user id');
+    }
+
+    const user = await this.accountModel.findById(currentUser).select('role').lean();
+    if (!user) {
+      throw new ForbiddenException('User not found');
+    }
+
+    if (!this.ALLOWED_ROLES_CREATE.includes(user.role)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    if (!createDto.selectedCartItemIds || createDto.selectedCartItemIds.length === 0) {
+      throw new BadRequestException('Must select at least one item from cart');
+    }
+
+    for (const cartItemId of createDto.selectedCartItemIds) {
+      if (!Types.ObjectId.isValid(cartItemId)) {
+        throw new BadRequestException(`Invalid cart item ID: ${cartItemId}`);
+      }
+    }
+
+    if (!createDto.shippingAddress || createDto.shippingAddress.trim().length < 10) {
+      throw new BadRequestException('Shipping address must be at least 10 characters');
+    }
+
+    const orderUserId = new Types.ObjectId(currentUser);
+
+    const cartItems = await this.cartModel
+      .find({
+        _id: { $in: createDto.selectedCartItemIds.map((id) => new Types.ObjectId(id)) },
+        userId: orderUserId,
+      })
       .lean();
 
-    const stockCollection = this.connection.db?.collection('stocks');
-    if (!stockCollection) {
-      throw new BadRequestException('Database connection error');
+    if (cartItems.length === 0) {
+      throw new BadRequestException('No valid cart items found');
     }
-    for (const item of order.items) {
-      await stockCollection.updateOne(
-        { bookId: new Types.ObjectId(item.bookId as any) },
-        { $inc: { quantity: item.quantity } },
+
+    if (cartItems.length !== createDto.selectedCartItemIds.length) {
+      throw new BadRequestException('Some cart items not found or do not belong to you');
+    }
+
+    const bookIds = cartItems.map((item) => item.bookId);
+
+    const stocks = await this.stockModel.find({ bookId: { $in: bookIds } }).lean();
+
+    if (stocks.length !== bookIds.length) {
+      throw new BadRequestException('Some books not found in stock');
+    }
+
+    const stockMap = new Map(stocks.map((stock) => [stock.bookId.toString(), stock]));
+
+    const items = cartItems.map((cartItem) => {
+      const stock = stockMap.get(cartItem.bookId.toString());
+      if (!stock) {
+        throw new BadRequestException(`Stock not found for book: ${cartItem.bookId.toString()}`);
+      }
+      if (!stock.price || stock.price <= 0) {
+        throw new BadRequestException(`Invalid price for book: ${cartItem.bookId.toString()}`);
+      }
+      const unitPrice = stock.price;
+      const subtotal = unitPrice * cartItem.quantity;
+
+      return {
+        bookId: cartItem.bookId,
+        quantity: cartItem.quantity,
+        unitPrice,
+        subtotal,
+      };
+    });
+
+    const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    let promotionId: Types.ObjectId | undefined;
+    let discountAmount = 0;
+
+    if (createDto.promotionCode) {
+      const promotion = await this.promotionModel
+        .findOne({ code: createDto.promotionCode.trim().toUpperCase() })
+        .lean();
+      if (!promotion) {
+        throw new NotFoundException('Promotion code not found');
+      }
+      if (promotion.status !== 'ACTIVE') {
+        throw new BadRequestException('Promotion is not active');
+      }
+      const now = new Date();
+      const startDate = new Date(promotion.startDate);
+      const endDate = new Date(promotion.endDate);
+      if (now < startDate) {
+        throw new BadRequestException('Promotion has not started yet');
+      }
+      if (now > endDate) {
+        throw new BadRequestException('Promotion has expired');
+      }
+      if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) {
+        throw new BadRequestException('Promotion usage limit has been reached');
+      }
+      if (promotion.usedByUsers && promotion.usedByUsers.some((id) => id.toString() === currentUser)) {
+        throw new BadRequestException('You have already used this promotion');
+      }
+      if (totalAmount < promotion.minOrderValue) {
+        throw new BadRequestException(`Minimum order value for this promotion is ${promotion.minOrderValue}`);
+      }
+      if (promotion.discountType === 'PERCENT') {
+        discountAmount = Math.floor((totalAmount * promotion.discountValue) / 100);
+        if (promotion.maxDiscount && discountAmount > promotion.maxDiscount) {
+          discountAmount = promotion.maxDiscount;
+        }
+      } else if (promotion.discountType === 'FIXED') {
+        discountAmount = promotion.discountValue;
+      }
+      promotionId = promotion._id;
+    }
+
+    const finalAmount = totalAmount - discountAmount;
+
+    if (finalAmount < 0) {
+      throw new BadRequestException('Invalid final amount');
+    }
+
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      const stockCollection = this.connection.db?.collection('stocks');
+      if (!stockCollection) {
+        throw new BadRequestException('Database connection error');
+      }
+      for (const item of items) {
+        const stock = await stockCollection.findOne({ bookId: new Types.ObjectId(item.bookId as any) }, { session });
+        if (!stock) {
+          throw new BadRequestException(`Stock not found for book ${item.bookId.toString()}`);
+        }
+        if (stock.quantity < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for book ${item.bookId.toString()}. Available: ${stock.quantity}`,
+          );
+        }
+        const result = await stockCollection.updateOne(
+          { bookId: new Types.ObjectId(item.bookId as any) },
+          { $inc: { quantity: -item.quantity } },
+          { session },
+        );
+
+        if (result.matchedCount === 0) {
+          throw new BadRequestException(`Failed to update stock for book ${item.bookId.toString()}`);
+        }
+      }
+
+      const lastOrder = await this.orderModel.findOne().sort({ createdAt: -1 }).session(session).lean();
+      let orderCode = 'ORD20250001';
+
+      if (lastOrder && lastOrder.orderCode) {
+        const lastNumber = parseInt(lastOrder.orderCode.replace('ORD', ''));
+        const nextNumber = lastNumber + 1;
+        orderCode = `ORD${nextNumber.toString().padStart(8, '0')}`;
+      }
+
+      const [newOrder] = await this.orderModel.create(
+        [
+          {
+            orderCode,
+            userId: orderUserId,
+            items,
+            status: 'PENDING',
+            totalAmount,
+            discountAmount,
+            finalAmount,
+            promotionId,
+            shippingAddress: createDto.shippingAddress,
+            paymentMethod: createDto.paymentMethod,
+            paymentStatus: 'UNPAID',
+            note: createDto.note,
+          },
+        ],
+        { session },
       );
-    }
 
-    if (order.promotionId) {
-      await this.promotionModel.findByIdAndUpdate(order.promotionId, {
-        $inc: { usedCount: -1 },
-      });
-    }
+      if (promotionId) {
+        const promotionResult = await this.promotionModel.findByIdAndUpdate(
+          promotionId,
+          {
+            $inc: { usedCount: 1 },
+            $addToSet: { usedByUsers: orderUserId },
+          },
+          { session },
+        );
 
-    return ApiResponse.success(cancelledOrder, 'Order cancelled successfully');
+        if (!promotionResult) {
+          throw new BadRequestException('Failed to update promotion');
+        }
+        const promotionData = await this.promotionModel.findById(promotionId).session(session).lean();
+        if (promotionData) {
+          await this.promotionLogService.createLog({
+            promotionId: promotionId.toString(),
+            promotionCode: promotionData.code,
+            promotionName: promotionData.name,
+            action: 'APPLY',
+            performedBy: orderUserId.toString(),
+            newData: {
+              orderId: newOrder._id.toString(),
+              orderCode: orderCode,
+              discountAmount,
+              finalAmount,
+              totalAmount,
+            },
+            note: `Customer applied promotion ${promotionData.code} for order ${orderCode}`,
+          });
+        }
+      }
+      await this.cartModel.deleteMany(
+        {
+          _id: { $in: createDto.selectedCartItemIds.map((id) => new Types.ObjectId(id)) },
+        },
+        { session },
+      );
+      await session.commitTransaction();
+      const order = await this.orderModel
+        .findById(newOrder._id)
+        .populate('userId', 'firstName lastName email phone')
+        .populate('promotionId', 'code name discountType discountValue')
+        .lean();
+      return new SuccessResponse(order, 'Order created from cart successfully');
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 }

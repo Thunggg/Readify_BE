@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -31,7 +32,6 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { BadRequestException } from '@nestjs/common';
-import { ApiResponse } from 'src/shared/responses/api-response';
 
 @Controller('accounts')
 export class AccountsController {
@@ -116,7 +116,7 @@ export class AccountsController {
       path: '/',
     });
 
-    return ApiResponse.success(null, 'Verify OTP successfully', 200);
+    return new SuccessResponse(null, 'Verify OTP successfully', 200);
   }
 
   @Get('me')
@@ -158,7 +158,7 @@ export class AccountsController {
     return this.accountsService.createAccount(dto);
   }
 
-  @Patch('edit/:id')
+  @Put('edit/:id')
   editAccount(@Param() params: AccountIdDto, @Body() dto: UpdateAccountDto) {
     return this.accountsService.editAccount(params.id, dto);
   }
