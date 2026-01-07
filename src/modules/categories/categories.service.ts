@@ -5,8 +5,9 @@ import { Category, CategoryDocument } from './schemas/category.schema';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ListCategoriesDto, CategorySortBy, SortOrder } from './dto/list-categories.dto';
-import { ApiResponse } from 'src/shared/responses/api-response';
 import { ErrorResponse } from 'src/shared/responses/error.response';
+import { SuccessResponse } from 'src/shared/responses/success.response';
+import { PaginatedResponse } from 'src/shared/responses/paginated.response';
 
 @Injectable()
 export class CategoriesService {
@@ -47,17 +48,11 @@ export class CategoriesService {
 
     const categoryData = category.toObject();
 
-    return ApiResponse.success(categoryData, 'Tạo danh mục thành công', 201);
+    return new SuccessResponse(categoryData, 'Tạo danh mục thành công', 201);
   }
 
   async getCategoriesList(query: ListCategoriesDto) {
-    const {
-      q,
-      sortBy = CategorySortBy.CREATED_AT,
-      order = SortOrder.DESC,
-      page = 1,
-      limit = 10,
-    } = query;
+    const { q, sortBy = CategorySortBy.CREATED_AT, order = SortOrder.DESC, page = 1, limit = 10 } = query;
 
     // PAGINATION
     const validPage = Math.max(1, page);
@@ -109,7 +104,7 @@ export class CategoriesService {
       this.categoryModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -144,13 +139,10 @@ export class CategoriesService {
       .lean();
 
     if (!category) {
-      throw new HttpException(
-        ErrorResponse.notFound('Category not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Category not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(category, 'Lấy chi tiết danh mục thành công', 200);
+    return new SuccessResponse(category, 'Lấy chi tiết danh mục thành công', 200);
   }
 
   async updateCategory(categoryId: string, dto: UpdateCategoryDto) {
@@ -168,16 +160,13 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new HttpException(
-        ErrorResponse.notFound('Category not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Category not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check if new name already exists (if name is being updated)
     if (dto.name !== undefined) {
       const newName = dto.name.trim();
-      
+
       // Check if name is empty after trim
       if (!newName) {
         throw new HttpException(
@@ -209,7 +198,7 @@ export class CategoriesService {
     const saved = await category.save();
     const categoryData = saved.toObject();
 
-    return ApiResponse.success(categoryData, 'Cập nhật danh mục thành công', 200);
+    return new SuccessResponse(categoryData, 'Cập nhật danh mục thành công', 200);
   }
 
   async deleteCategory(categoryId: string) {
@@ -227,17 +216,13 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new HttpException(
-        ErrorResponse.notFound('Category not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Category not found'), HttpStatus.NOT_FOUND);
     }
 
     // Soft delete
     category.isDeleted = true;
     await category.save();
 
-    return ApiResponse.success({ _id: categoryId }, 'Xóa danh mục thành công', 200);
+    return new SuccessResponse({ _id: categoryId }, 'Xóa danh mục thành công', 200);
   }
 }
-

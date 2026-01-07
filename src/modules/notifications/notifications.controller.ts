@@ -21,36 +21,20 @@ export class NotificationsController {
     private readonly configService: ConfigService,
   ) {}
 
-  private getUserIdFromToken(req: any): string {
-    const token = req?.cookies?.accessToken;
-    if (!token) {
-      return req?.user?.userId; // Fallback to req.user if no token
-    }
-    try {
-      const payload = this.jwtUtil.verifyAccessToken(
-        token,
-        this.configService.get<string>('jwt.accessTokenSecret') as string,
-      );
-      return payload.sub.toString();
-    } catch {
-      return req?.user?.userId; // Fallback to req.user if decode fails
-    }
-  }
-
   @Post()
   createNotification(@Body() dto: CreateNotificationDto, @Req() req: any) {
-    const userId = this.getUserIdFromToken(req);
+    const userId = req?.user?.userId as string;
     return this.notificationsService.createNotification(dto, userId);
   }
 
   @Get()
   getNotificationsList(
     @Query() query: ListNotificationsDto,
+    @Req() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Req() req: any,
   ) {
-    const userId = this.getUserIdFromToken(req);
+    const userId = req?.user?.userId as string;
     return this.notificationsService.getNotificationsList(query, userId, page, limit);
   }
 
@@ -71,23 +55,19 @@ export class NotificationsController {
 
   @Get(':id')
   getNotificationDetail(@Param() params: NotificationIdDto, @Req() req: any) {
-    const userId = this.getUserIdFromToken(req);
+    const userId = req?.user?.userId as string;
     return this.notificationsService.getNotificationDetail(params.id, userId);
   }
 
   @Patch('mark-all-read')
   markAllAsRead(@Req() req: any) {
-    const userId = this.getUserIdFromToken(req);
+    const userId = req?.user?.userId as string;
     return this.notificationsService.markAllAsRead(userId);
   }
 
   @Patch(':id')
-  updateNotification(
-    @Param() params: NotificationIdDto,
-    @Body() dto: UpdateNotificationDto,
-    @Req() req: any,
-  ) {
-    const userId = this.getUserIdFromToken(req);
+  updateNotification(@Param() params: NotificationIdDto, @Body() dto: UpdateNotificationDto, @Req() req: any) {
+    const userId = req?.user?.userId as string;
     const role = req?.user?.role;
     return this.notificationsService.updateNotification(params.id, dto, userId, role);
   }
@@ -95,7 +75,7 @@ export class NotificationsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   deleteNotification(@Param() params: NotificationIdDto, @Req() req: any) {
-    const userId = this.getUserIdFromToken(req);
+    const userId = req?.user?.userId as string;
     const role = req?.user?.role;
     return this.notificationsService.deleteNotification(params.id, userId, role);
   }
@@ -103,8 +83,7 @@ export class NotificationsController {
   @Delete('read/:id')
   @UseGuards(JwtAuthGuard)
   deleteNotificationRead(@Param() params: NotificationIdDto, @Req() req: any) {
-    const userId = this.getUserIdFromToken(req);
+    const userId = req?.user?.userId as string;
     return this.notificationsService.deleteNotificationRead(params.id, userId);
   }
 }
-

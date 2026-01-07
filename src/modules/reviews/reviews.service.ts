@@ -6,9 +6,10 @@ import { Book, BookDocument } from '../book/schemas/book.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ListReviewsDto, ReviewSortBy, SortOrder } from './dto/list-reviews.dto';
-import { ApiResponse } from 'src/shared/responses/api-response';
 import { ErrorResponse } from 'src/shared/responses/error.response';
 import { AccountRole } from '../staff/constants/staff.enum';
+import { PaginatedResponse } from 'src/shared/responses/paginated.response';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Injectable()
 export class ReviewsService {
@@ -35,10 +36,7 @@ export class ReviewsService {
     });
 
     if (!book) {
-      throw new HttpException(
-        ErrorResponse.notFound('Book not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check if user already reviewed this book
@@ -98,7 +96,7 @@ export class ReviewsService {
       })
       .lean();
 
-    return ApiResponse.success(reviewData, 'Tạo đánh giá thành công', 201);
+    return new SuccessResponse(reviewData, 'Tạo đánh giá thành công', 201);
   }
 
   async getReviewsList(query: ListReviewsDto, currentUserId?: string, currentUserRole?: number) {
@@ -193,7 +191,7 @@ export class ReviewsService {
       this.reviewModel.countDocuments(baseFilter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -243,13 +241,10 @@ export class ReviewsService {
       .lean();
 
     if (!review) {
-      throw new HttpException(
-        ErrorResponse.notFound('Review not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Review not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(review, 'Lấy chi tiết đánh giá thành công', 200);
+    return new SuccessResponse(review, 'Lấy chi tiết đánh giá thành công', 200);
   }
 
   async updateReview(reviewId: string, dto: UpdateReviewDto, currentUserId: string, currentUserRole?: number) {
@@ -267,10 +262,7 @@ export class ReviewsService {
     });
 
     if (!review) {
-      throw new HttpException(
-        ErrorResponse.notFound('Review not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Review not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check permission: user can only update their own reviews, admin can update any
@@ -324,7 +316,7 @@ export class ReviewsService {
       })
       .lean();
 
-    return ApiResponse.success(reviewData, 'Cập nhật đánh giá thành công', 200);
+    return new SuccessResponse(reviewData, 'Cập nhật đánh giá thành công', 200);
   }
 
   async deleteReview(reviewId: string, currentUserId: string, currentUserRole?: number) {
@@ -342,10 +334,7 @@ export class ReviewsService {
     });
 
     if (!review) {
-      throw new HttpException(
-        ErrorResponse.notFound('Review not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Review not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check permission: user can only delete their own reviews, admin can delete any
@@ -363,7 +352,7 @@ export class ReviewsService {
     // Update book rating summary
     await this.updateBookRatingSummary(review.bookId.toString());
 
-    return ApiResponse.success({ _id: reviewId }, 'Xóa đánh giá thành công', 200);
+    return new SuccessResponse({ _id: reviewId }, 'Xóa đánh giá thành công', 200);
   }
 
   async getBookReviews(bookId: string, page: number = 1, limit: number = 10) {
@@ -405,7 +394,7 @@ export class ReviewsService {
       this.reviewModel.countDocuments(baseFilter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -430,10 +419,7 @@ export class ReviewsService {
     });
 
     if (!book) {
-      throw new HttpException(
-        ErrorResponse.notFound('Book not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
     // Get rating statistics
@@ -479,7 +465,7 @@ export class ReviewsService {
       });
     }
 
-    return ApiResponse.success(
+    return new SuccessResponse(
       {
         bookId,
         ratingAvg,
@@ -506,10 +492,7 @@ export class ReviewsService {
     });
 
     if (!review) {
-      throw new HttpException(
-        ErrorResponse.notFound('Review not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Review not found'), HttpStatus.NOT_FOUND);
     }
 
     // Prevent user from marking their own review as helpful
@@ -524,7 +507,7 @@ export class ReviewsService {
     review.helpfulCount += 1;
     await review.save();
 
-    return ApiResponse.success(
+    return new SuccessResponse(
       { _id: reviewId, helpfulCount: review.helpfulCount },
       'Đánh dấu đánh giá hữu ích thành công',
       200,
@@ -570,4 +553,3 @@ export class ReviewsService {
     );
   }
 }
-

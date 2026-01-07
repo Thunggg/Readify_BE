@@ -7,9 +7,10 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { ListNotificationsDto } from './dto/list-notifications.dto';
 import { AdminListNotificationsDto } from './dto/admin-list-notifications.dto';
-import { ApiResponse } from 'src/shared/responses/api-response';
 import { ErrorResponse } from 'src/shared/responses/error.response';
 import { AccountRole } from '../staff/constants/staff.enum';
+import { PaginatedResponse } from 'src/shared/responses/paginated.response';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Injectable()
 export class NotificationsService {
@@ -44,7 +45,7 @@ export class NotificationsService {
 
     const notificationData = notification.toObject();
 
-    return ApiResponse.success(notificationData, 'Tạo thông báo thành công', 201);
+    return new SuccessResponse(notificationData, 'Tạo thông báo thành công', 201);
   }
 
   async getNotificationsList(query: ListNotificationsDto, currentUserId: string, page: number = 1, limit: number = 10) {
@@ -80,10 +81,7 @@ export class NotificationsService {
         notificationIdsFilter = readRecords.map((r) => r.notificationId as Types.ObjectId);
       } else {
         // Get all notification IDs
-        const allNotifications = await this.notificationModel
-          .find(baseFilter)
-          .select('_id')
-          .lean();
+        const allNotifications = await this.notificationModel.find(baseFilter).select('_id').lean();
         const allNotificationIds = allNotifications.map((n) => n._id as Types.ObjectId);
 
         // Get read notification IDs
@@ -91,19 +89,15 @@ export class NotificationsService {
           .find({ userId: currentUserIdObj })
           .select('notificationId')
           .lean();
-        const readNotificationIds = new Set(
-          readRecords.map((r) => r.notificationId.toString()),
-        );
+        const readNotificationIds = new Set(readRecords.map((r) => r.notificationId.toString()));
 
         // Filter out read notifications
-        notificationIdsFilter = allNotificationIds.filter(
-          (id) => !readNotificationIds.has(id.toString()),
-        );
+        notificationIdsFilter = allNotificationIds.filter((id) => !readNotificationIds.has(id.toString()));
       }
 
       // If no notifications match the isRead filter, return empty result
       if (notificationIdsFilter.length === 0) {
-        return ApiResponse.paginated(
+        return new PaginatedResponse(
           [],
           {
             page: validPage,
@@ -151,9 +145,7 @@ export class NotificationsService {
       })
       .lean();
 
-    const readMap = new Map(
-      readRecords.map((record) => [record.notificationId.toString(), record.readAt]),
-    );
+    const readMap = new Map(readRecords.map((record) => [record.notificationId.toString(), record.readAt]));
 
     // ADD isRead AND readAt TO EACH ITEM
     const itemsWithReadStatus = items.map((item) => {
@@ -165,7 +157,7 @@ export class NotificationsService {
       };
     });
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       itemsWithReadStatus,
       {
         page: validPage,
@@ -207,10 +199,7 @@ export class NotificationsService {
       .lean();
 
     if (!notification) {
-      throw new HttpException(
-        ErrorResponse.notFound('Notification not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Notification not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check if already read
@@ -234,10 +223,15 @@ export class NotificationsService {
       readAt: readRecord.readAt,
     };
 
-    return ApiResponse.success(notificationData, 'Lấy chi tiết thông báo thành công', 200);
+    return new SuccessResponse(notificationData, 'Lấy chi tiết thông báo thành công', 200);
   }
 
-  async updateNotification(notificationId: string, dto: UpdateNotificationDto, currentUserId: string, currentUserRole?: number) {
+  async updateNotification(
+    notificationId: string,
+    dto: UpdateNotificationDto,
+    currentUserId: string,
+    currentUserRole?: number,
+  ) {
     // Validate notificationId
     if (!Types.ObjectId.isValid(notificationId)) {
       throw new HttpException(
@@ -252,10 +246,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new HttpException(
-        ErrorResponse.notFound('Notification not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Notification not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check permission: user can only update their own notifications, admin can update any
@@ -267,10 +258,7 @@ export class NotificationsService {
     }
 
     if (!notification) {
-      throw new HttpException(
-        ErrorResponse.notFound('Notification not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Notification not found'), HttpStatus.NOT_FOUND);
     }
 
     // Handle isRead update using NotificationRead collection
@@ -306,7 +294,7 @@ export class NotificationsService {
       userId: new Types.ObjectId(currentUserId),
     });
 
-    return ApiResponse.success(
+    return new SuccessResponse(
       {
         ...notificationData,
         isRead: !!readRecord,
@@ -332,10 +320,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new HttpException(
-        ErrorResponse.notFound('Notification not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Notification not found'), HttpStatus.NOT_FOUND);
     }
 
     // Check permission: user can only delete their own notifications, admin can delete any
@@ -350,7 +335,7 @@ export class NotificationsService {
     notification.isActive = false;
     await notification.save();
 
-    return ApiResponse.success({ _id: notificationId }, 'Xóa thông báo thành công', 200);
+    return new SuccessResponse({ _id: notificationId }, 'Xóa thông báo thành công', 200);
   }
 
   async markAllAsRead(currentUserId: string) {
@@ -374,14 +359,10 @@ export class NotificationsService {
       .select('notificationId')
       .lean();
 
-    const alreadyReadIds = new Set(
-      alreadyRead.map((r) => r.notificationId.toString()),
-    );
+    const alreadyReadIds = new Set(alreadyRead.map((r) => r.notificationId.toString()));
 
     // Filter out already read notifications
-    const toMarkAsRead = notificationIds.filter(
-      (id) => !alreadyReadIds.has(id.toString()),
-    );
+    const toMarkAsRead = notificationIds.filter((id) => !alreadyReadIds.has(id.toString()));
 
     // Create NotificationRead records for unread notifications
     const readRecords = toMarkAsRead.map((notificationId) => ({
@@ -394,7 +375,7 @@ export class NotificationsService {
       await this.notificationReadModel.insertMany(readRecords);
     }
 
-    return ApiResponse.success(
+    return new SuccessResponse(
       { updatedCount: readRecords.length },
       'Đánh dấu tất cả thông báo đã đọc thành công',
       200,
@@ -445,10 +426,7 @@ export class NotificationsService {
         notificationIdsFilter = readRecords.map((r) => r.notificationId as Types.ObjectId);
       } else {
         // Get all notification IDs for this user
-        const allNotifications = await this.notificationModel
-          .find(baseFilter)
-          .select('_id')
-          .lean();
+        const allNotifications = await this.notificationModel.find(baseFilter).select('_id').lean();
         const allNotificationIds = allNotifications.map((n) => n._id as Types.ObjectId);
 
         // Get read notification IDs
@@ -456,19 +434,15 @@ export class NotificationsService {
           .find({ userId: userIdObj })
           .select('notificationId')
           .lean();
-        const readNotificationIds = new Set(
-          readRecords.map((r) => r.notificationId.toString()),
-        );
+        const readNotificationIds = new Set(readRecords.map((r) => r.notificationId.toString()));
 
         // Filter out read notifications
-        notificationIdsFilter = allNotificationIds.filter(
-          (id) => !readNotificationIds.has(id.toString()),
-        );
+        notificationIdsFilter = allNotificationIds.filter((id) => !readNotificationIds.has(id.toString()));
       }
 
       // If no notifications match the isRead filter, return empty result
       if (notificationIdsFilter.length === 0) {
-        return ApiResponse.paginated(
+        return new PaginatedResponse(
           [],
           {
             page: validPage,
@@ -512,7 +486,7 @@ export class NotificationsService {
     // GET READ STATUS FOR EACH NOTIFICATION (if userId is provided)
     let itemsWithReadStatus: any[] = items;
     if (userId) {
-      const notificationIds = items.map((item) => item._id);
+      const notificationIds = items.map((item: any) => item._id as Types.ObjectId);
       const userIdObj = new Types.ObjectId(userId);
       const readRecords = await this.notificationReadModel
         .find({
@@ -521,28 +495,28 @@ export class NotificationsService {
         })
         .lean();
 
-      const readMap = new Map(
-        readRecords.map((record) => [record.notificationId.toString(), record.readAt]),
-      );
+      const readMap = new Map(readRecords.map((record) => [record.notificationId.toString(), record.readAt]));
 
       itemsWithReadStatus = items.map((item: any) => {
         const readAt = readMap.get(item._id.toString());
-        return {
-          ...item,
-          isRead: !!readAt,
-          readAt: readAt || null,
-        };
+        return new SuccessResponse(
+          {
+            ...item,
+            isRead: !!readAt,
+            readAt: readAt || null,
+          },
+          'Lấy danh sách thông báo thành công',
+          200,
+        );
       });
     } else {
       // If no userId filter, mark all as not read (admin view)
-      itemsWithReadStatus = items.map((item: any) => ({
-        ...item,
-        isRead: false,
-        readAt: null,
-      }));
+      itemsWithReadStatus = items.map(
+        (item: any) => new SuccessResponse(item, 'Lấy danh sách thông báo thành công', 200),
+      );
     }
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       itemsWithReadStatus,
       {
         page: validPage,
@@ -588,10 +562,7 @@ export class NotificationsService {
       .lean();
 
     if (!notification) {
-      throw new HttpException(
-        ErrorResponse.notFound('Notification not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Notification not found'), HttpStatus.NOT_FOUND);
     }
 
     // Get read status for the notification owner
@@ -608,10 +579,10 @@ export class NotificationsService {
         readAt: readRecord?.readAt || null,
       };
 
-      return ApiResponse.success(notificationData, 'Lấy chi tiết thông báo thành công', 200);
+      return new SuccessResponse(notificationData, 'Lấy chi tiết thông báo thành công', 200);
     }
 
-    return ApiResponse.success(
+    return new SuccessResponse(
       {
         ...notification,
         isRead: false,
@@ -638,10 +609,7 @@ export class NotificationsService {
     });
 
     if (!notificationRead) {
-      throw new HttpException(
-        ErrorResponse.notFound('Notification read record not found'),
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(ErrorResponse.notFound('Notification read record not found'), HttpStatus.NOT_FOUND);
     }
 
     // Soft delete
@@ -649,7 +617,6 @@ export class NotificationsService {
     notificationRead.deletedAt = new Date();
     await notificationRead.save();
 
-    return ApiResponse.success({ _id: notificationReadId }, 'Xóa bản ghi đã đọc thành công', 200);
+    return new SuccessResponse({ _id: notificationReadId }, 'Xóa bản ghi đã đọc thành công', 200);
   }
 }
-
