@@ -449,7 +449,7 @@ export class OrderService {
 
       await session.commitTransaction();
 
-      return ApiResponse.success(cancelledOrder, 'Order cancelled successfully');
+      return new SuccessResponse(cancelledOrder, 'Order cancelled successfully');
     } catch (error) {
       await session.abortTransaction();
       throw error;
@@ -684,7 +684,7 @@ export class OrderService {
         .populate('userId', 'firstName lastName email phone')
         .populate('promotionId', 'code name discountType discountValue')
         .lean();
-      return ApiResponse.success(order, 'Order created from cart successfully');
+      return new SuccessResponse(order, 'Order created from cart successfully');
     } catch (error) {
       await session.abortTransaction();
       throw error;
