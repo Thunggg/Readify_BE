@@ -1,6 +1,5 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { Model, ObjectId } from 'mongoose';
-import { ApiResponse } from 'src/shared/responses/api-response';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ErrorResponse } from 'src/shared/responses/error.response';
@@ -9,6 +8,7 @@ import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 import { JwtUtil } from 'src/shared/utils/jwt';
 import { LoginDto } from './dto/login.dto';
 import { RefreshToken, RefreshTokenDocument } from '../accounts/schemas/refresh-token.schema';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Injectable()
 export class AuthService {
@@ -29,19 +29,19 @@ export class AuthService {
     const account = await this.accountModel.findOne({ email }).select('+password');
 
     if (!account) {
-      throw new HttpException(ApiResponse.error('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
+      throw new HttpException(new ErrorResponse('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
     }
 
     // 2) compare password
     const isPasswordValid = await comparePassword(password, account.password);
 
     if (!isPasswordValid) {
-      throw new HttpException(ApiResponse.error('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
+      throw new HttpException(new ErrorResponse('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
     }
 
     // 3) check email is verified or not
     if (account.status === 2) {
-      throw new HttpException(ApiResponse.error('Email is not verified', 'EMAIL_NOT_VERIFIED', 400), 400);
+      throw new HttpException(new ErrorResponse('Email is not verified', 'EMAIL_NOT_VERIFIED', 400), 400);
     }
 
     // 4) generate access token and refresh token
@@ -65,12 +65,12 @@ export class AuthService {
       updatedAt: new Date(),
     });
 
-    return ApiResponse.success({ accessToken }, 'Login successful', 200);
+    return new SuccessResponse({ accessToken }, 'Login successful', 200);
   }
 
   async logout(token: string) {
     if (!token) {
-      throw new HttpException(ApiResponse.error('Unauthorized', 'UNAUTHORIZED', 401), 401);
+      throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
     }
 
     const userId = this.jwtUtil.verifyAccessToken(
@@ -79,6 +79,6 @@ export class AuthService {
     ).sub;
 
     await this.refreshTokenModel.deleteOne({ userId });
-    return ApiResponse.success('Logged out successfully', 'LOGOUT_SUCCESS', 200);
+    return new SuccessResponse('Logged out successfully', 'LOGOUT_SUCCESS', 200);
   }
 }

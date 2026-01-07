@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import { ValidationError } from 'class-validator';
+import { ErrorResponse } from 'src/shared/responses/error.response';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -13,6 +15,15 @@ async function bootstrap() {
       transform: true,
       whitelist: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: (validationErrors: ValidationError[] = []) => {
+        //https://stackoverflow.com/questions/75581669/customize-error-message-in-nest-js-using-class-validator
+        const details = validationErrors.map((error) => ({
+          field: error.property,
+          message: Object.values(error.constraints ?? {}).join(', '),
+        }));
+
+        return new BadRequestException(new ErrorResponse('Validation Error', 'VALIDATION_ERROR', 400, details));
+      },
     }),
   );
 
@@ -29,4 +40,4 @@ async function bootstrap() {
   const port = Number(configService.get<string>('port') ?? 3000);
   await app.listen(port);
 }
-bootstrap();
+void bootstrap();

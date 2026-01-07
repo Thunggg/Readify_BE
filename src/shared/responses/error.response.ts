@@ -4,12 +4,10 @@ import { BaseResponse } from './base.response';
 export interface ErrorDetail {
   field?: string;
   message: string;
-  code?: string;
 }
 
 export interface ErrorData {
   code: string;
-  message: string;
   details?: ErrorDetail[];
 }
 
@@ -22,7 +20,6 @@ export class ErrorResponse extends BaseResponse<ErrorData> {
   ) {
     const errorData: ErrorData = {
       code: errorCode,
-      message,
       details,
     };
 

@@ -1,4 +1,4 @@
 export enum OtpPurpose {
-  FORGOT_PASSWORD = 'forgot_password',
-  VERIFY_EMAIL = 'verify_email',
+  FORGOT_PASSWORD = 'FORGOT_PASSWORD',
+  VERIFY_EMAIL = 'VERIFY_EMAIL',
 }

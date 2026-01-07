@@ -6,8 +6,8 @@ import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { Stock, StockDocument } from '../stock/schemas/stock.schema';
 import { Book, BookDocument } from '../book/schemas/book.schema';
-import { ApiResponse } from '../../shared/responses/api-response';
 import { ErrorResponse } from '../../shared/responses/error.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class CartService {
@@ -56,7 +56,7 @@ export class CartService {
         // Update quantity if item already exists
         existingItem.quantity = newQuantity;
         const updated = await existingItem.save();
-        return ApiResponse.success(updated, 'Item quantity updated in cart successfully');
+        return new SuccessResponse(updated, 'Item quantity updated in cart successfully');
       }
 
       // Check if requested quantity exceeds stock for new item
@@ -75,7 +75,7 @@ export class CartService {
       });
 
       const created = await newCartItem.save();
-      return ApiResponse.success(created, 'Item added to cart successfully');
+      return new SuccessResponse(created, 'Item added to cart successfully');
     } catch (error) {
       if (error.code === 11000) {
         throw new HttpException(ErrorResponse.badRequest('Book already exists in cart'), HttpStatus.BAD_REQUEST);
@@ -120,7 +120,7 @@ export class CartService {
 
     cartItem.quantity = quantity;
     const updated = await cartItem.save();
-    return ApiResponse.success(updated, 'Cart item updated successfully');
+    return new SuccessResponse(updated, 'Cart item updated successfully');
   }
 
   async removeFromCart(userId: string, bookId: string) {
@@ -138,7 +138,7 @@ export class CartService {
       throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(null, 'Item removed from cart successfully');
+    return new SuccessResponse(null, 'Item removed from cart successfully');
   }
 
   async getCartByUserId(userId: string) {
@@ -147,6 +147,10 @@ export class CartService {
       throw new BadRequestException('Invalid userId');
     }
 
+    // Validate và tự động cập nhật số lượng trong cart dựa trên stock hiện tại
+    const validationResult = await this.validateCartStock(userId);
+
+    // Lấy lại cart items sau khi đã validate và update
     const cartItems = await this.cartModel
       .find({ userId: new Types.ObjectId(userId) })
       .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
@@ -154,7 +158,74 @@ export class CartService {
       .lean()
       .exec();
 
-    return ApiResponse.success(cartItems, 'Cart retrieved successfully');
+    return new SuccessResponse(
+      {
+        items: cartItems,
+        validation: {
+          updated: validationResult.updated,
+          removed: validationResult.removed,
+          warnings: validationResult.warnings,
+        },
+      },
+      'Cart retrieved successfully',
+    );
+  }
+
+  /**
+   * Validate số lượng trong cart so với stock hiện tại
+   * Tự động cập nhật hoặc xóa items nếu stock không đủ
+   */
+  async validateCartStock(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
+    }
+
+    const cartItems = await this.cartModel.find({ userId: new Types.ObjectId(userId) });
+    const warnings: any[] = [];
+    const updated: any[] = [];
+    const removed: any[] = [];
+
+    // Duyệt qua từng item trong cart
+    for (const item of cartItems) {
+      const stock = await this.stockModel.findOne({ bookId: item.bookId });
+
+      // Nếu không tìm thấy stock hoặc stock = 0 => xóa item khỏi cart
+      if (!stock || stock.quantity === 0) {
+        await this.cartModel.deleteOne({ _id: item._id });
+        removed.push({
+          bookId: item.bookId,
+          oldQuantity: item.quantity,
+          reason: 'out_of_stock',
+        });
+        warnings.push({
+          bookId: item.bookId,
+          message: 'Book is out of stock and has been removed from cart',
+        });
+        continue;
+      }
+
+      // Nếu số lượng trong cart > stock hiện tại => cập nhật về số lượng tối đa có thể
+      if (item.quantity > stock.quantity) {
+        item.quantity = stock.quantity;
+        await item.save();
+        updated.push({
+          bookId: item.bookId,
+          oldQuantity: item.quantity,
+          newQuantity: stock.quantity,
+        });
+        warnings.push({
+          bookId: item.bookId,
+          message: `Quantity adjusted from ${item.quantity} to ${stock.quantity} due to stock availability`,
+          availableStock: stock.quantity,
+        });
+      }
+    }
+
+    return {
+      updated,
+      removed,
+      warnings,
+    };
   }
 
   async clearCart(userId: string) {
@@ -167,7 +238,7 @@ export class CartService {
       userId: new Types.ObjectId(userId),
     });
 
-    return ApiResponse.success(null, 'Cart cleared successfully');
+    return new SuccessResponse(null, 'Cart cleared successfully');
   }
 
   async getCartItemCount(userId: string) {
@@ -180,7 +251,7 @@ export class CartService {
       userId: new Types.ObjectId(userId),
     });
 
-    return ApiResponse.success({ count }, 'Cart count retrieved successfully');
+    return new SuccessResponse({ count }, 'Cart count retrieved successfully');
   }
 
   async getCartItem(userId: string, bookId: string) {
@@ -202,7 +273,7 @@ export class CartService {
       throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(cartItem, 'Cart item retrieved successfully');
+    return new SuccessResponse(cartItem, 'Cart item retrieved successfully');
   }
 
   async toggleSelectItem(userId: string, bookId: string) {
@@ -229,7 +300,7 @@ export class CartService {
       { new: true },
     );
 
-    return ApiResponse.success(updated, 'Cart item selection toggled successfully');
+    return new SuccessResponse(updated, 'Cart item selection toggled successfully');
   }
 
   async updateItemSelection(userId: string, bookId: string, isSelected: boolean) {
@@ -251,7 +322,7 @@ export class CartService {
       throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
     }
 
-    return ApiResponse.success(cartItem, 'Cart item selection updated successfully');
+    return new SuccessResponse(cartItem, 'Cart item selection updated successfully');
   }
 
   async selectAllItems(userId: string) {
@@ -262,7 +333,7 @@ export class CartService {
 
     await this.cartModel.updateMany({ userId: new Types.ObjectId(userId) }, { isSelected: true });
 
-    return ApiResponse.success(null, 'All cart items selected successfully');
+    return new SuccessResponse(null, 'All cart items selected successfully');
   }
 
   async deselectAllItems(userId: string) {
@@ -273,7 +344,7 @@ export class CartService {
 
     await this.cartModel.updateMany({ userId: new Types.ObjectId(userId) }, { isSelected: false });
 
-    return ApiResponse.success(null, 'All cart items deselected successfully');
+    return new SuccessResponse(null, 'All cart items deselected successfully');
   }
 
   async getSelectedItems(userId: string) {
@@ -292,6 +363,6 @@ export class CartService {
       .lean()
       .exec();
 
-    return ApiResponse.success(selectedItems, 'Selected cart items retrieved successfully');
+    return new SuccessResponse(selectedItems, 'Selected cart items retrieved successfully');
   }
 }

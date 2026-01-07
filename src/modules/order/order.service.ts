@@ -15,7 +15,8 @@ import { Book, BookDocument } from '../book/schemas/book.schema';
 import { Stock, StockDocument } from '../stock/schemas/stock.schema';
 import { PromotionLogService } from '../promotion-log/promotion-log.service';
 
-import { ApiResponse } from '../../shared/responses/api-response';
+import { PaginatedResponse } from '../../shared/responses/paginated.response';
+import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class OrderService {
@@ -123,7 +124,7 @@ export class OrderService {
       this.orderModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
@@ -168,7 +169,7 @@ export class OrderService {
       }
     }
 
-    return ApiResponse.success(order, 'Get order detail success');
+    return new SuccessResponse(order, 'Get order detail success');
   }
 
   async updateOrder(orderId: string, updateDto: UpdateOrderDto, currentUser: string) {
@@ -251,7 +252,7 @@ export class OrderService {
       .populate('promotionId', 'code name discountType discountValue')
       .lean();
 
-    return ApiResponse.success(updatedOrder, 'Order updated successfully');
+    return new SuccessResponse(updatedOrder, 'Order updated successfully');
   }
 
   async getOrderHistory(query: SearchOrderDto, currentUser: string) {
@@ -335,7 +336,7 @@ export class OrderService {
       this.orderModel.countDocuments(filter),
     ]);
 
-    return ApiResponse.paginated(
+    return new PaginatedResponse(
       items,
       {
         page: validPage,
