@@ -194,6 +194,7 @@ export class AccountsService {
     if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
     if (dto.address !== undefined) account.address = dto.address;
     if (dto.sex !== undefined) account.sex = dto.sex;
+    if (dto.bio !== undefined) account.bio = dto.bio;
 
     const saved = await account.save();
     const { password, ...accountData } = saved.toObject();
