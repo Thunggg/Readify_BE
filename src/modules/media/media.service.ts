@@ -2,15 +2,19 @@ import { BadRequestException, ForbiddenException, HttpStatus, Injectable, NotFou
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CloudinaryService } from './cloudinary/cloudinary.service';
-import { Media, MediaStatus, MediaType } from './schemas/media.schema';
 import { UploadMediaDto } from './dto/upload-media.dto';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { MediaFolder, MediaStatus, MediaType } from './enum/media.enum';
+import { Media, MediaDocument, MediaSchema } from './schemas/media.schema';
+import { Account } from '../accounts/schemas/account.schema';
 
 @Injectable()
 export class MediaService {
   constructor(
     @InjectModel(Media.name)
     private readonly mediaModel: Model<Media>,
+    @InjectModel(Account.name)
+    private readonly accountModel: Model<Account>,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
@@ -20,31 +24,42 @@ export class MediaService {
     return 'image';
   }
 
-  async uploadOne(params: { file: Express.Multer.File; dto: UploadMediaDto; uploadedBy?: string }) {
-    const { file, dto, uploadedBy } = params;
+  async uploadAvatar(file: Express.Multer.File, dto: UploadMediaDto, uploadedBy?: string) {
+    try {
+      if (!file?.buffer) throw new BadRequestException('Missing file buffer');
 
-    if (!file?.buffer) throw new BadRequestException('Missing file buffer');
-    const type = dto.type ?? MediaType.IMAGE;
+      const type = dto.type ?? MediaType.IMAGE;
 
-    const uploaded = await this.cloudinaryService.uploadBuffer({
-      buffer: file.buffer,
-      folder: dto.folder,
-      resourceType: this.mapTypeToResourceType(type),
-      filename: file.originalname,
-    });
+      const uploaded = await this.cloudinaryService.uploadBuffer({
+        buffer: file.buffer,
+        folder: dto.folder,
+        resourceType: this.mapTypeToResourceType(type),
+        filename: file.originalname,
+      });
 
-    const doc = await this.mediaModel.create({
-      url: uploaded.url,
-      publicId: uploaded.publicId,
-      type,
-      status: MediaStatus.TEMP,
-      uploadedBy: uploadedBy ? new Types.ObjectId(uploadedBy) : undefined,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-    });
+      const doc = await this.mediaModel.create({
+        url: uploaded.url,
+        publicId: uploaded.publicId,
+        type,
+        status: MediaStatus.TEMP,
+        uploadedBy: uploadedBy ? new Types.ObjectId(uploadedBy) : undefined,
+        folder: dto.folder as MediaFolder,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+      });
 
-    return new SuccessResponse(doc, 'Media uploaded successfully', HttpStatus.CREATED);
+      const account = await this.accountModel.findById(uploadedBy);
+
+      if (account) {
+        account.avatarUrl = doc.url;
+        await account.save();
+      }
+
+      return new SuccessResponse(doc, 'Media uploaded successfully', HttpStatus.CREATED);
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 
   async remove(mediaId: string, userId?: string) {

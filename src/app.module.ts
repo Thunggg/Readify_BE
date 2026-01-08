@@ -17,7 +17,6 @@ import { OrderModule } from './modules/order/order.module';
 import { CartModule } from './modules/cart/cart.module';
 import { MediaModule } from './modules/media/media.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { UploadsModule } from './modules/uploads/uploads.module';
 import { MailModule } from './modules/mail/mail.module';
 import { OtpModule } from './modules/otp/otp.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -44,7 +43,6 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     OrderModule,
     CartModule,
     MediaModule,
-    UploadsModule,
     MailModule,
     OtpModule,
     NotificationsModule,

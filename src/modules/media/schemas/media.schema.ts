@@ -1,18 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
+import { MediaFolder, MediaStatus, MediaType } from '../enum/media.enum';
 
 export type MediaDocument = HydratedDocument<Media>;
-
-export enum MediaType {
-  IMAGE = 'image',
-  VIDEO = 'video',
-  FILE = 'file',
-}
-
-export enum MediaStatus {
-  TEMP = 'TEMP',
-  ATTACHED = 'ATTACHED',
-}
 
 @Schema({ timestamps: true })
 export class Media {
@@ -34,6 +24,9 @@ export class Media {
   @Prop({ type: Types.ObjectId, ref: 'Account', index: true })
   uploadedBy?: Types.ObjectId;
 
+  @Prop({ enum: Object.values(MediaFolder) })
+  folder: MediaFolder;
+
   @Prop({
     type: {
       model: { type: String },
@@ -51,11 +44,6 @@ export class Media {
 
   @Prop()
   mimeType?: string;
-
-  // timestamps fields
-  @Prop()
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export const MediaSchema = SchemaFactory.createForClass(Media);

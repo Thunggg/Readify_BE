@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadMediaDto } from './dto/upload-media.dto';
+import { Types } from 'mongoose';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
@@ -12,8 +13,8 @@ export class MediaController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async upload(@UploadedFile() file: Express.Multer.File, @Body() dto: UploadMediaDto, @Req() req: any) {
-    const userId = req.user.userId;
-    return this.mediaService.uploadOne({ file, dto, uploadedBy: userId });
+    const userId = req.user.userId ?? '';
+    return this.mediaService.uploadAvatar(file, dto, userId as string);
   }
 
   @Delete(':id')

@@ -261,10 +261,6 @@ export class AccountsService {
     return new SuccessResponse(null, 'Password changed successfully', 200);
   }
 
-  async uploadFile(file: Express.Multer.File) {
-    console.log(file);
-  }
-
   async createAccount(dto: CreateAccountDto) {
     const email = dto.email.trim().toLowerCase();
 
@@ -654,5 +650,9 @@ export class AccountsService {
 
     const { password, ...accountData } = account.toObject();
     return new SuccessResponse(accountData, 'Password reset successfully', 200);
+  }
+
+  async uploadAvatar(file: Express.Multer.File) {
+    console.log(file);
   }
 }
