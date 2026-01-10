@@ -56,4 +56,11 @@ export class JwtUtil {
     };
     return this.jwt.verify(token, options) as unknown as ResetPasswordPayload;
   }
+
+  verifyRefreshToken(token: string, secret: string) {
+    const options: JwtVerifyOptions = {
+      secret,
+    };
+    return this.jwt.verify(token, options) as unknown as RefreshTokenPayload;
+  }
 }
