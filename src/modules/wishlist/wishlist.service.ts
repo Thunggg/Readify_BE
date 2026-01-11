@@ -27,9 +27,14 @@ export class WishlistService {
   async addToWishlist(userId: string, addToWishlistDto: AddToWishlistDto) {
     const { bookId } = addToWishlistDto;
 
+    console.log('=== ADD TO WISHLIST DEBUG ===');
+    console.log('userId:', userId);
+    console.log('bookId:', bookId);
+
     // Kiểm tra id có đúng format ObjectId của MongoDB không
     // ObjectId có 24 ký tự hex (0-9, a-f)
     if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(bookId)) {
+      console.log('Invalid ObjectId format');
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'userId/bookId', message: 'Invalid userId or bookId' }]),
         HttpStatus.BAD_REQUEST,
@@ -38,17 +43,37 @@ export class WishlistService {
 
     // Kiểm tra sách có tồn tại trong database không
     // exists() trả về true/false, nhanh hơn findOne()
+    console.log('Checking if book exists...');
     const bookExists = await this.bookModel.exists({ _id: bookId });
+    console.log('Book exists:', bookExists);
     if (!bookExists) {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
+    // Kiểm tra stock availability
+    console.log('Checking stock...');
+    const stock = await this.stockModel.findOne({ bookId: new Types.ObjectId(bookId) });
+    console.log('Stock found:', stock);
+    // stock không tồn tại
+    if (!stock) {
+      throw new HttpException(ErrorResponse.notFound('Book not found in stock'), HttpStatus.NOT_FOUND);
+    }
+
+    // stock không đủ điều kiện để thêm vào wishlist
+    if (stock.quantity < 1 || stock.status !== 'available') {
+      console.log('Stock not available. Quantity:', stock.quantity, 'Status:', stock.status);
+      throw new HttpException(ErrorResponse.notFound('Book not available in stock'), HttpStatus.NOT_FOUND);
+    }
+
     // Kiểm tra sách đã có trong wishlist chưa
+    console.log('Checking if already in wishlist...');
     const existingItem = await this.wishlistModel.exists({
       userId: new Types.ObjectId(userId),
       bookId: new Types.ObjectId(bookId),
     });
+    console.log('Existing item:', existingItem);
 
+    // Nếu đã có, trả về thông báo đã có trong wishlist
     if (existingItem) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'bookId', message: 'Book already in wishlist' }]),
@@ -58,21 +83,28 @@ export class WishlistService {
 
     try {
       // Tạo wishlist item mới
+      console.log('Creating wishlist item...');
       const created = await this.wishlistModel.create({
         userId: new Types.ObjectId(userId),
         bookId: new Types.ObjectId(bookId),
+        stockId: stock._id, // Add stockId from the stock we already fetched
       });
+      console.log('Created successfully:', created);
 
       const data = {
         _id: (created as any)._id,
         userId: (created as any).userId,
         bookId: (created as any).bookId,
+        stockId: (created as any).stockId,
         createdAt: (created as any).createdAt,
         updatedAt: (created as any).updatedAt,
       };
 
       return new SuccessResponse(data, 'Successfully added to wishlist');
     } catch (error) {
+      // Log error để debug
+      console.error('Error adding to wishlist:', error);
+
       // Xử lý lỗi duplicate key (MongoDB error code 11000)
       // Có thể xảy ra nếu 2 request cùng lúc thêm cùng 1 sách
       if (error.code === 11000) {
@@ -81,8 +113,11 @@ export class WishlistService {
           HttpStatus.CONFLICT,
         );
       }
+
+      // Return more detailed error message
+      const errorMessage = error?.message || 'Failed to add to wishlist';
       throw new HttpException(
-        new ErrorResponse('Failed to add to wishlist', 'INTERNAL_ERROR', 500),
+        new ErrorResponse(String(errorMessage), 'INTERNAL_ERROR', 500),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -104,7 +139,7 @@ export class WishlistService {
       .find({ userId: new Types.ObjectId(userId) })
       .populate({
         path: 'bookId',
-        select: 'title author price discount coverImage description isbn',
+        select: 'title authors price discount thumbnailUrl description isbn',
       })
       .sort({ createdAt: -1, _id: 1 }) // Sắp xếp phụ theo _id để đảm bảo thứ tự ổn định
       .lean();
@@ -211,7 +246,7 @@ export class WishlistService {
       throw new HttpException(ErrorResponse.notFound('Book not found in stock'), HttpStatus.NOT_FOUND);
     }
 
-    if (stock.quantity < 1) {
+    if (stock.quantity < 1 || stock.status !== 'available') {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'stock', message: 'Book is out of stock' }]),
         HttpStatus.BAD_REQUEST,

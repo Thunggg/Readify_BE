@@ -53,7 +53,7 @@ export class StockService {
         },
       ]);
 
-      return new SuccessResponse(stocks, 'Lấy danh sách tồn kho thành công');
+      return new SuccessResponse(stocks, 'Successfully fetched stock list');
     } catch (err) {
       this.logger.error('Error fetching stock list: ' + String(err));
       throw new HttpException(
@@ -102,7 +102,7 @@ export class StockService {
         throw new HttpException(ErrorResponse.notFound('Stock not found'), HttpStatus.NOT_FOUND);
       }
 
-      return new SuccessResponse(stocks[0], 'Lấy chi tiết tồn kho thành công');
+      return new SuccessResponse(stocks[0], 'Successfully fetched stock detail');
     } catch (err) {
       if (err instanceof HttpException) throw err;
       this.logger.error('Error fetching stock detail: ' + String(err));
@@ -113,7 +113,9 @@ export class StockService {
     }
   }
 
+  // Import stock data from Excel file buffer
   async importStockFromExcel(buffer: Buffer): Promise<ImportStockResultDto> {
+    // Kết quả import ban đầu
     const result: ImportStockResultDto = {
       success: true,
       imported: 0,
@@ -133,9 +135,10 @@ export class StockService {
       // Expected columns: ISBN, Quantity, Location, Price, Batch, Status
       const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
+      // KIỂM TRA FILE EXCEL CÓ DỮ LIỆU HAY KHÔNG
       if (rows.length === 0) {
         result.success = false;
-        result.errors.push({ row: 0, message: 'File Excel trống hoặc không có dữ liệu' });
+        result.errors.push({ row: 0, message: 'Excel file is empty or contains no data' });
         return result;
       }
 
@@ -172,6 +175,8 @@ export class StockService {
 
           // Kiểm tra lỗi validation (VD: isbn bắt buộc, quantity phải là số...)
           const validationErrors = await validate(stockDto);
+
+          // Nếu có lỗi validation, ghi nhận lỗi và chuyển sang dòng tiếp theo
           if (validationErrors.length > 0) {
             const errorMessages = validationErrors
               .map((err) => Object.values(err.constraints || {}).join(', '))

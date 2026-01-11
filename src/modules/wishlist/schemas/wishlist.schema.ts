@@ -10,6 +10,9 @@ export class Wishlist {
 
   @Prop({ type: Types.ObjectId, ref: 'Book', required: true })
   bookId: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Stock', required: true })
+  stockId: Types.ObjectId;
 }
 
 export const WishlistSchema = SchemaFactory.createForClass(Wishlist);
