@@ -1,6 +1,6 @@
 import { IsMongoId } from 'class-validator';
 
 export class StaffIdDto {
-  @IsMongoId()
+  @IsMongoId({ message: 'Invalid staff id format' })
   id: string;
 }

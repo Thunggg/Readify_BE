@@ -11,14 +11,14 @@ import { Roles } from '../../shared/decorators/roles.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { AccountRole } from './constants/staff.enum';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(AccountRole.ADMIN)
+// @UseGuards(JwtAuthGuard, RolesGuard)
+// @Roles(AccountRole.ADMIN)
 @Controller('staff')
 export class StaffController {
   constructor(private readonly staffService: StaffService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   getList(@Query() query: SearchStaffDto) {
     return this.staffService.getStaffList(query);
   }

@@ -8,6 +8,15 @@ export const AccountRole = {
 
 export type AccountRoleValue = (typeof AccountRole)[keyof typeof AccountRole];
 
+// ===== ACCOUNT STAFF ROLE =====
+export const AccountStaffRole = {
+  ADMIN: 1,
+  SELLER: 2,
+  WAREHOUSE: 3,
+} as const;
+
+export type AccountStaffRoleValue = (typeof AccountStaffRole)[keyof typeof AccountStaffRole];
+
 // ===== ACCOUNT STATUS =====
 export const AccountStatus = {
   INACTIVE: 0,
