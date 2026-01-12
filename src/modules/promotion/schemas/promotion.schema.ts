@@ -64,6 +64,9 @@ export class Promotion {
   /** Trạng thái do admin quản lý (có thể tự suy ra EXPIRED theo thời gian, nhưng lưu để tiện) */
   @Prop({ default: 'INACTIVE', enum: ['ACTIVE', 'INACTIVE', 'EXPIRED'] })
   status: string;
+  //danh dau user da su dung ma nay
+  @Prop({ type: [Types.ObjectId], ref: 'Account', default: [] })
+  usedByUsers: Types.ObjectId[];
 
   /** Phạm vi áp dụng (hiện tại chỉ có ORDER) */
   @Prop({ default: 'ORDER', enum: ['ORDER'] })

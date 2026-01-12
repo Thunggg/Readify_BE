@@ -120,7 +120,7 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return new SuccessResponse( items , 'Get book suggestions successfully');
+    return new SuccessResponse(items, 'Get book suggestions successfully');
   }
 
   async getBookDetailById(id: string) {
@@ -192,7 +192,7 @@ export class BooksPublicService {
         basePrice: 1,
         currency: 1,
         soldCount: 1,
-          createdAt: 1,
+        createdAt: 1,
         tags: 1,
       })
 
