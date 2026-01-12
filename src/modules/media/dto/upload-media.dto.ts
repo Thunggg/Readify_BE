@@ -1,12 +1,10 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { MediaType } from '../schemas/media.schema';
+import { IsEnum } from 'class-validator';
+import { MediaFolder, MediaType } from '../enum/media.enum';
 
 export class UploadMediaDto {
-  @IsOptional()
   @IsEnum(MediaType)
-  type?: MediaType;
+  type: MediaType;
 
-  @IsOptional()
-  @IsString()
-  folder?: string;
+  @IsEnum(MediaFolder)
+  folder: MediaFolder;
 }

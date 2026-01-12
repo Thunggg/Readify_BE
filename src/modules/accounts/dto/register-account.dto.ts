@@ -1,5 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEmail, IsInt, IsNotEmpty, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEmail,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { MinAge } from 'src/shared/validators/min-age.validator';
 
 export class RegisterAccountDto {
@@ -16,6 +27,7 @@ export class RegisterAccountDto {
   @IsString({ message: 'Phone must be a string' })
   @IsNotEmpty({ message: 'Phone can not be empty' })
   @MaxLength(30, { message: 'Phone must be less than 30 characters long' })
+  @Matches(/^[0-9]+$/, { message: 'Phone must be a number' })
   phone: string;
 
   @IsString({ message: 'Address must be a string' })

@@ -1,15 +1,18 @@
 import {
   IsDate,
+  IsDateString,
   IsEmail,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { MinAge } from 'src/shared/validators/min-age.validator';
 
 export class UpdateAccountDto {
   @IsOptional()
@@ -40,14 +43,16 @@ export class UpdateAccountDto {
   lastName?: string;
 
   @IsOptional()
-  @Type(() => Date)
-  @IsDate({ message: 'Date of birth must be a date' })
+  @IsDateString({}, { message: 'dateOfBirth must be a valid ISO date string' })
+  @IsNotEmpty({ message: 'dateOfBirth can not be empty' })
+  @MinAge(16, { message: 'You must be at least 16 years old' })
   dateOfBirth?: Date;
 
   @IsOptional()
   @IsString({ message: 'Phone must be a string' })
   @MaxLength(20, { message: 'Phone must be less than 20 characters long' })
   @MinLength(1, { message: 'Phone can not be empty' })
+  @Matches(/^[0-9]+$/, { message: 'Phone must be a number' })
   phone?: string;
 
   @IsOptional()
@@ -61,12 +66,6 @@ export class UpdateAccountDto {
   @MaxLength(255, { message: 'Address must be less than 255 characters long' })
   @MinLength(1, { message: 'Address can not be empty' })
   address?: string;
-
-  @IsOptional()
-  @IsString({ message: 'Bio must be a string' })
-  @MaxLength(500, { message: 'Bio must be less than 500 characters long' })
-  @MinLength(1, { message: 'Bio can not be empty' })
-  bio?: string;
 
   // 1: active, 0: inactive, 2: not active email
   @IsOptional()

@@ -6,10 +6,10 @@ import { Author } from '../schemas/author.schema';
 import { SearchAdminBooksDto } from '../dto/search-admin-books.dto';
 import { CreateBookDto } from '../dto/create-book.dto';
 import { UpdateBookDto } from '../dto/update-book.dto';
-// use response classes directly
 import { ErrorResponse } from '../../../shared/responses/error.response';
 import { Stock } from 'src/modules/stock/schemas/stock.schema';
-import { Media, MediaStatus } from 'src/modules/media/schemas/media.schema';
+import { Media } from 'src/modules/media/schemas/media.schema';
+import { MediaStatus } from 'src/modules/media/enum/media.enum';
 import { Category } from 'src/modules/categories/schemas/category.schema';
 import { Supplier } from 'src/modules/supplier/schemas/supplier.schema';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
