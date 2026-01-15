@@ -17,10 +17,12 @@ import { OrderModule } from './modules/order/order.module';
 import { CartModule } from './modules/cart/cart.module';
 import { MediaModule } from './modules/media/media.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { UploadsModule } from './modules/uploads/uploads.module';
 import { MailModule } from './modules/mail/mail.module';
 import { OtpModule } from './modules/otp/otp.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
 @Module({
   imports: [
@@ -42,10 +44,12 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     OrderModule,
     CartModule,
     MediaModule,
-    UploadsModule,
     MailModule,
     OtpModule,
     WishlistModule,
+    NotificationsModule,
+    CategoriesModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

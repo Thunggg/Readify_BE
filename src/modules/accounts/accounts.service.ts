@@ -194,6 +194,7 @@ export class AccountsService {
     if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
     if (dto.address !== undefined) account.address = dto.address;
     if (dto.sex !== undefined) account.sex = dto.sex;
+    if (dto.bio !== undefined) account.bio = dto.bio;
 
     const saved = await account.save();
     const { password, ...accountData } = saved.toObject();
@@ -211,13 +212,20 @@ export class AccountsService {
 
     if (dto.newPassword !== dto.confirmPassword) {
       throw new HttpException(
-        ErrorResponse.badRequest('New password and confirm password do not match'),
+        ErrorResponse.validationError([
+          { field: 'newPassword', message: 'New password and confirm password do not match' },
+        ]),
         HttpStatus.BAD_REQUEST,
       );
     }
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new HttpException(ErrorResponse.badRequest('New password must be different'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        ErrorResponse.validationError([
+          { field: 'newPassword', message: 'New password must be different from current password' },
+        ]),
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const account = await this.accountModel.findById(userId).select('+password');
@@ -238,7 +246,10 @@ export class AccountsService {
 
     const ok = await comparePassword(dto.currentPassword, account.password);
     if (!ok) {
-      throw new HttpException(ErrorResponse.badRequest('Current password is incorrect'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'currentPassword', message: 'Current password is incorrect' }]),
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     account.password = await hashPassword(dto.newPassword, Number(this.configService.get<number>('bcrypt.saltRounds')));
@@ -248,10 +259,6 @@ export class AccountsService {
     await this.refreshTokenModel.deleteMany({ userId: saved._id });
 
     return new SuccessResponse(null, 'Password changed successfully', 200);
-  }
-
-  async uploadFile(file: Express.Multer.File) {
-    console.log(file);
   }
 
   async createAccount(dto: CreateAccountDto) {
@@ -643,5 +650,9 @@ export class AccountsService {
 
     const { password, ...accountData } = account.toObject();
     return new SuccessResponse(accountData, 'Password reset successfully', 200);
+  }
+
+  async uploadAvatar(file: Express.Multer.File) {
+    console.log(file);
   }
 }

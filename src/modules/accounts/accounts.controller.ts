@@ -137,12 +137,6 @@ export class AccountsController {
     return this.accountsService.changePassword(req?.user?.userId as string, dto);
   }
 
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return this.accountsService.uploadFile(file);
-  }
-
   @Get(':id')
   getAccountDetail(@Param() params: AccountIdDto) {
     return this.accountsService.getAccountDetail(params.id);
@@ -187,5 +181,11 @@ export class AccountsController {
     this.clearOtpCookies(res);
 
     return response;
+  }
+
+  @Post('upload-avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadAvatar(@UploadedFile() file: Express.Multer.File) {
+    return this.accountsService.uploadAvatar(file);
   }
 }

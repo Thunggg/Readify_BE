@@ -5,10 +5,10 @@ import { Book, BookDocument } from '../schemas/book.schema';
 import { SearchAdminBooksDto } from '../dto/search-admin-books.dto';
 import { CreateBookDto } from '../dto/create-book.dto';
 import { UpdateBookDto } from '../dto/update-book.dto';
-// use response classes directly
 import { ErrorResponse } from '../../../shared/responses/error.response';
 import { Stock } from 'src/modules/stock/schemas/stock.schema';
-import { Media, MediaStatus } from 'src/modules/media/schemas/media.schema';
+import { Media } from 'src/modules/media/schemas/media.schema';
+import { MediaStatus } from 'src/modules/media/enum/media.enum';
 import { Category } from 'src/modules/categories/schemas/category.schema';
 import { Supplier } from 'src/modules/supplier/schemas/supplier.schema';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
@@ -316,10 +316,7 @@ export class BooksAdminService {
     }
 
     // Validate publisher (supplier) exists and is not deleted
-    const publisher = await this.supplierModel
-      .findById(dto.publisherId)
-      .select({ _id: 1, isDeleted: 1 })
-      .lean();
+    const publisher = await this.supplierModel.findById(dto.publisherId).select({ _id: 1, isDeleted: 1 }).lean();
 
     if (!publisher) {
       throw new HttpException(
@@ -813,7 +810,6 @@ export class BooksAdminService {
           isDeleted: true,
           deletedAt: new Date(),
         };
-    
 
         await this.bookModel.updateOne({ _id: book._id }, { $set: updateData }, { session });
 
@@ -831,7 +827,7 @@ export class BooksAdminService {
       });
 
       return new SuccessResponse(null, 'Book deleted successfully');
-    } finally { 
+    } finally {
       session.endSession();
     }
   }
@@ -863,14 +859,14 @@ export class BooksAdminService {
         // Restore Book
         await this.bookModel.updateOne(
           { _id: book._id },
-          { 
+          {
             $set: { isDeleted: false },
-            $unset: { deletedAt: 1}
+            $unset: { deletedAt: 1 },
           },
-          { session }
+          { session },
         );
 
-        // Restore stock status 
+        // Restore stock status
         await this.stockModel.updateMany(
           { bookId: book._id },
           {

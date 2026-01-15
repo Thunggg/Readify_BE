@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDate, IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { MinAge } from 'src/shared/validators/min-age.validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -13,8 +14,9 @@ export class UpdateProfileDto {
   lastName?: string;
 
   @IsOptional()
-  @Type(() => Date)
-  @IsDate({ message: 'Date of birth must be a date' })
+  @IsDateString({}, { message: 'dateOfBirth must be a valid ISO date string' })
+  @IsNotEmpty({ message: 'dateOfBirth can not be empty' })
+  @MinAge(16, { message: 'You must be at least 16 years old' })
   dateOfBirth?: Date;
 
   @IsOptional()
@@ -36,4 +38,9 @@ export class UpdateProfileDto {
   @Type(() => Number)
   @IsInt({ message: 'Sex must be a number' })
   sex?: number; // 0 unknown, 1 male, 2 female
+
+  @IsOptional()
+  @IsString({ message: 'Bio must be a string' })
+  @MaxLength(500, { message: 'Bio must be less than 500 characters long' })
+  bio?: string;
 }

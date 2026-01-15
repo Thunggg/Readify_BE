@@ -48,7 +48,10 @@ export class Account {
   role: number; // 0: user, 1: admin, 2: seller, 3: warehouse manager
 
   @Prop({ default: 0 })
-  sex: number; // 1: male, 2: female
+  sex: number; // 0: unknown, 1: male, 2: female
+
+  @Prop({ trim: true, maxLength: 500 })
+  bio?: string;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);

@@ -12,8 +12,21 @@ export const validateEnv = Joi.object({
   CLOUDINARY_CLOUD_NAME: Joi.string().required(),
   CLOUDINARY_API_KEY: Joi.string().required(),
   CLOUDINARY_API_SECRET: Joi.string().required(),
-  MAIL_USER: Joi.string().required(),
-  MAIL_PASS: Joi.string().required(),
+  MAIL_USER: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.allow('').optional()
+  }),
+  MAIL_PASS: Joi.string().when('NODE_ENV', {
+    is: 'production', 
+    then: Joi.required(),
+    otherwise: Joi.allow('').optional()
+  }),
+  FRONTEND_URL: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.optional()
+  }),
 
   // OTP (optional; defaults are applied in configuration.ts)
   OTP_EXPIRES_IN_MINUTES: Joi.number().integer().positive().optional(),

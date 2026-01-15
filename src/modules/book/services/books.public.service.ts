@@ -90,7 +90,6 @@ export class BooksPublicService {
     return new PaginatedResponse(items, { page, limit, total }, 'Get books list successfully');
   }
 
-
   async getBookSuggestions(query: SearchBookSuggestionsDto) {
     const keyword = query.q?.trim();
     const limit = Math.min(query.limit ?? 6, 10);
@@ -121,7 +120,7 @@ export class BooksPublicService {
       .limit(limit)
       .lean();
 
-    return new SuccessResponse({ items }, 'Get book suggestions successfully');
+    return new SuccessResponse(items, 'Get book suggestions successfully');
   }
 
   async getBookDetailById(id: string) {

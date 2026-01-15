@@ -65,7 +65,7 @@ export class AuthService {
       updatedAt: new Date(),
     });
 
-    return new SuccessResponse({ accessToken }, 'Login successful', 200);
+    return new SuccessResponse({ accessToken, refreshToken }, 'Login successful', 200);
   }
 
   async logout(token: string) {
@@ -80,5 +80,47 @@ export class AuthService {
 
     await this.refreshTokenModel.deleteOne({ userId });
     return new SuccessResponse('Logged out successfully', 'LOGOUT_SUCCESS', 200);
+  }
+
+  async refreshToken(refreshToken: string) {
+    if (!refreshToken) {
+      throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
+    }
+
+    try {
+      // 1) verify refresh token
+      const verifiedRefreshToken = this.jwtUtil.verifyRefreshToken(
+        refreshToken,
+        this.configService.get<string>('jwt.refreshTokenSecret') as string,
+      );
+      if (!verifiedRefreshToken) {
+        throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
+      }
+
+      // 2) tìm refresh token trong database
+      const refreshTokenDocument = await this.refreshTokenModel.findOne({ token: refreshToken });
+
+      if (!refreshTokenDocument) {
+        throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
+      }
+
+      // 3) lay thong tin account
+      const account = await this.accountModel.findById(refreshTokenDocument.userId);
+
+      if (!account) {
+        throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
+      }
+
+      // 4) tao access token moi
+      const accessToken = this.jwtUtil.signAccessToken(
+        { sub: account._id as unknown as ObjectId, email: account.email, role: account.role },
+        this.configService.get<string>('jwt.accessTokenSecret') as string,
+        this.configService.get<number>('jwt.accessTokenExpiresIn') as number,
+      );
+
+      return new SuccessResponse({ accessToken }, 'Refresh token successful', 200);
+    } catch (error) {
+      throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
+    }
   }
 }
