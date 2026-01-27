@@ -7,7 +7,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   // POST /auth/login
   @HttpCode(HttpStatus.OK)
@@ -21,7 +21,7 @@ export class AuthController {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 15 * 60 * 1000, // 15 phút
+      maxAge: 10 * 1000, // 10 giây
       path: '/',
     });
 
@@ -49,8 +49,8 @@ export class AuthController {
   //POST /auth/refresh-token
   @HttpCode(HttpStatus.OK)
   @Post('refresh-token')
-  async refreshToken(@Body() dto: RefreshTokenDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.refreshToken(dto.refreshToken);
+  async refreshToken(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const response = await this.authService.refreshToken(req?.cookies?.refreshToken as string);
 
     const { accessToken } = response.data;
 
