@@ -46,12 +46,27 @@ export class AccountsService {
 
   async register(dto: RegisterAccountDto) {
     const email = dto.email.trim().toLowerCase();
+    const phone = dto.phone.trim();
 
-    const isEmailExists = await this.accountModel.exists({ email });
+
+    const [isEmailExists, isPhoneExists] = await Promise.all([
+      this.accountModel.exists({ email }),
+      this.accountModel.exists({ phone }),
+    ]);
+
     if (isEmailExists) {
       throw new HttpException(
         new ErrorResponse('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
           { field: 'email', message: 'Email already exists' },
+        ]),
+        400,
+      );
+    }
+
+    if (isPhoneExists) {
+      throw new HttpException(
+        new ErrorResponse('Phone already exists', 'PHONE_ALREADY_EXISTS', 400, [
+          { field: 'phone', message: 'Phone already exists' },
         ]),
         400,
       );
