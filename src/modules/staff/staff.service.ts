@@ -155,7 +155,7 @@ export class StaffService {
       role,
       isDeleted,
       sortBy = StaffSortBy.CREATED_AT,
-      order = SortOrder.DESC,
+      order = SortOrder.ASC,
       page = 1,
       limit = 10,
     } = query;
