@@ -96,7 +96,7 @@ export class Author {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   updatedBy?: Types.ObjectId;
 }
-
+  
 /**
  * Tạo schema mongoose cho Author
  */

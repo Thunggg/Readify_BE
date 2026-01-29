@@ -4,6 +4,7 @@ import { LoginDto } from './dto/login.dto';
 import type { Response } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
@@ -17,13 +18,14 @@ export class AuthController {
 
     const { accessToken, refreshToken } = response.data;
 
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 15 * 60 * 1000, // 15 phút
+      maxAge: 1200 * 60 * 1000, // 15 phút
       path: '/',
-    });
+    }); 
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,

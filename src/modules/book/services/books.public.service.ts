@@ -49,7 +49,6 @@ export class BooksPublicService {
       filter.$or = [
         { title: { $regex: keyword, $options: 'i' } },
         { slug: { $regex: keyword, $options: 'i' } },
-        { authors: { $elemMatch: { $regex: keyword, $options: 'i' } } },
         { isbn: { $regex: keyword, $options: 'i' } },
       ];
     }
@@ -80,6 +79,7 @@ export class BooksPublicService {
           categoryIds: 1,
           createdAt: 1,
         })
+        .populate('authors', 'name slug')
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -106,7 +106,6 @@ export class BooksPublicService {
         $or: [
           { title: { $regex: keyword, $options: 'i' } },
           { slug: { $regex: keyword, $options: 'i' } },
-          { authors: { $elemMatch: { $regex: keyword, $options: 'i' } } },
         ],
       })
       .select({
@@ -116,6 +115,7 @@ export class BooksPublicService {
         basePrice: 1,
         authors: 1,
       })
+      .populate('authors', 'name slug')
       .sort({ soldCount: -1 })
       .limit(limit)
       .lean();
@@ -153,6 +153,7 @@ export class BooksPublicService {
         createdAt: 1,
       })
       // populate
+      .populate('authors', 'name slug')
       .populate('publisherId', 'name')
       .populate('categoryIds', 'name slug')
       .lean();
@@ -196,9 +197,10 @@ export class BooksPublicService {
         tags: 1,
       })
 
-      .populate('categoryIds', 'name slug')
+      .populate('authors', 'name slug')
+      .populate('categoryIds',    'name slug')
       .populate('publisherId', 'name')
-      .populate('images', 'url ')
+      .populate('images', 'url')
 
       .lean();
 
@@ -260,6 +262,7 @@ export class BooksPublicService {
         categoryIds: 1,
         createdAt: 1,
       })
+      .populate('authors', 'name slug')
       // Sort đơn giản: ưu tiên bán chạy + mới
       .sort({ soldCount: -1, createdAt: -1 })
       .limit(limit)
@@ -316,6 +319,7 @@ export class BooksPublicService {
         categoryIds: 1,
         createdAt: 1,
       })
+      .populate('authors', 'name slug')
       .sort({ soldCount: -1, createdAt: -1 })
       .limit(limit)
       .lean();

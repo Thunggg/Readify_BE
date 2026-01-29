@@ -34,6 +34,7 @@ import { PaginatedResponse } from '../../shared/responses/paginated.response';
 import { SuccessResponse } from '../../shared/responses/success.response';
 import { ConfigService } from '@nestjs/config';
 import { hashPassword } from 'src/shared/utils/bcrypt';
+
 function normalizeName(str: string) {
   return str
     .trim() // bỏ space đầu/cuối
@@ -63,6 +64,7 @@ export class StaffService {
         // Nếu client không truyền → mặc định là staff
         // Nếu truyền → chỉ lấy các role staff (2,3)
         $in: role?.length ? role : STAFF_ROLES,
+        $ne: AccountRole.ADMIN,
       },
     };
 
@@ -97,6 +99,7 @@ export class StaffService {
 
     return filter;
   }
+
   private buildSortStage(sortBy: StaffSortByValue, order: SortOrderValue): PipelineStage {
     const dir = order === SortOrder.ASC ? 1 : -1;
 

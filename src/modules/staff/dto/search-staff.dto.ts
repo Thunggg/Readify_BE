@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsDate, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { AccountStatus, StaffSortBy, SortOrder, Sex, AccountStaffRole } from '../constants/staff.enum';
 import type {
@@ -74,6 +74,27 @@ export class SearchStaffDto {
     message: 'Role must be 1 (ADMIN), 2 (SELLER), or 3 (WAREHOUSE)',
   })
   role?: AccountStaffRoleValue[];
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  createdFrom?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  createdTo?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  lastLoginFrom?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  lastLoginTo?: Date;
+  
   // ===== SORT =====
   @IsOptional()
   @IsEnum(StaffSortBy, {

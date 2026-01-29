@@ -497,13 +497,13 @@ export class BooksAdminService {
           thumbnailUrl: thumbnailUrl,
           basePrice: dto.basePrice,
           currency: dto.currency || BookCurrency.VND,
-          status: BookStatus.DRAFT,
+          status: BookStatus.ACTIVE,
           tags: dto.tags || [],
           isDeleted: false,
           soldCount: 0,
           publishedAt: undefined,
         } satisfies Partial<Book>;
-
+        
         const book = await new this.bookModel(bookPayload).save({ session });
         createdBook = book;
 
