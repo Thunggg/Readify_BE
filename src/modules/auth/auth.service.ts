@@ -9,6 +9,10 @@ import { JwtUtil } from 'src/shared/utils/jwt';
 import { LoginDto } from './dto/login.dto';
 import { RefreshToken, RefreshTokenDocument } from '../accounts/schemas/refresh-token.schema';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { RegisterAccountDto } from './dto/register-account.dto';
+import { PendingRegistration, PendingRegistrationDocument } from '../accounts/schemas/pendingRegistration.schema';
+import { OtpService } from '../otp/otp.service';
+import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 
 @Injectable()
 export class AuthService {
@@ -17,9 +21,83 @@ export class AuthService {
     private readonly accountModel: Model<AccountDocument>,
     @InjectModel(RefreshToken.name)
     private readonly refreshTokenModel: Model<RefreshTokenDocument>,
+    @InjectModel(PendingRegistration.name)
+    private readonly pendingRegistrationModel: Model<PendingRegistrationDocument>,
     private readonly configService: ConfigService,
+    private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
-  ) {}
+  ) { }
+
+  async register(dto: RegisterAccountDto) {
+    const email = dto.email.trim().toLowerCase();
+    const phone = dto.phone.trim();
+
+    const [isEmailExists, isPhoneExists] = await Promise.all([
+      this.accountModel.exists({ email }),
+      this.accountModel.exists({ phone }),
+    ]);
+
+    if (isEmailExists) {
+      throw new HttpException(
+        new ErrorResponse('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
+          { field: 'email', message: 'Email already exists' },
+        ]),
+        400,
+      );
+    }
+
+    if (isPhoneExists) {
+      throw new HttpException(
+        new ErrorResponse('Phone number already exists', 'PHONE_ALREADY_EXISTS', 400, [
+          { field: 'phone', message: 'Phone number already exists' },
+        ]),
+        400,
+      );
+    }
+
+    if (dto.password !== dto.confirmPassword) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ message: 'Password and confirm password do not match' }]),
+        400,
+      );
+    }
+
+    const passwordHash = await hashPassword(
+      dto.password,
+      this.configService.get<number>('bcrypt.saltRounds') as number,
+    );
+
+    const expiresInMinutes = Number(this.configService.get<number>('pendingRegistration.expiresInMinutes') ?? 15);
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+    // Save pending registration (upsert) — Account is created after email verification
+    await this.pendingRegistrationModel.updateOne(
+      { email },
+      {
+        $set: {
+          email,
+          password: passwordHash,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          phone: phone,
+          address: dto.address.trim(),
+          dateOfBirth: new Date(dto.dateOfBirth),
+          sex: dto.sex,
+          expiresAt,
+        },
+      },
+      { upsert: true },
+    );
+
+    // Send OTP verify email (fallback to resend if record exists)
+    try {
+      await this.otpService.sendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
+    } catch (err: any) {
+      await this.otpService.reSendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
+    }
+
+    return new SuccessResponse(null, 'OTP sent successfully. Please verify to complete registration.', 200);
+  }
 
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();

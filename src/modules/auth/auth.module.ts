@@ -9,6 +9,8 @@ import { Account, AccountSchema } from '../accounts/schemas/account.schema';
 import { JwtUtil } from 'src/shared/utils/jwt';
 import { RefreshToken, RefreshTokenSchema } from '../accounts/schemas/refresh-token.schema';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { PendingRegistration, PendingRegistrationSchema } from '../accounts/schemas/pendingRegistration.schema';
+import { OtpModule } from '../otp/otp.module';
 
 @Module({
   imports: [
@@ -16,8 +18,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtModule.register({}), // secrets lấy từ ConfigService trong JwtUtil/AuthService
     MongooseModule.forFeature([{ name: Account.name, schema: AccountSchema }]),
     MongooseModule.forFeature([{ name: RefreshToken.name, schema: RefreshTokenSchema }]),
+    MongooseModule.forFeature([{ name: PendingRegistration.name, schema: PendingRegistrationSchema }]),
+    OtpModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtUtil, JwtStrategy],
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -31,9 +31,6 @@ export class Account {
   @Prop({ trim: true, select: false })
   password: string;
 
-  @Prop({ trim: true })
-  googleId?: string;
-
   @Prop()
   lastLoginAt?: Date;
 

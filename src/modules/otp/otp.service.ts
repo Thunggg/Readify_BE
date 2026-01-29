@@ -16,7 +16,7 @@ export class OtpService {
     @InjectModel(EmailOtp.name) private readonly otpModel: Model<EmailOtpDocument>,
     private readonly mail: MailService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   private makeOtp(): string {
     const n = Math.floor(Math.random() * 1_000_000);
