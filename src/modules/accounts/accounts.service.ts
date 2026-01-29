@@ -1,7 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Model, PipelineStage, Types, type QueryFilter } from 'mongoose';
 import { Account, AccountDocument } from './schemas/account.schema';
-import { RegisterAccountDto } from './dto/register-account.dto';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ErrorResponse } from 'src/shared/responses/error.response';
@@ -43,78 +42,6 @@ export class AccountsService {
     private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
   ) { }
-
-  async register(dto: RegisterAccountDto) {
-    const email = dto.email.trim().toLowerCase();
-    const phone = dto.phone.trim();
-
-
-    const [isEmailExists, isPhoneExists] = await Promise.all([
-      this.accountModel.exists({ email }),
-      this.accountModel.exists({ phone }),
-    ]);
-
-    if (isEmailExists) {
-      throw new HttpException(
-        new ErrorResponse('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
-          { field: 'email', message: 'Email already exists' },
-        ]),
-        400,
-      );
-    }
-
-    if (isPhoneExists) {
-      throw new HttpException(
-        new ErrorResponse('Phone already exists', 'PHONE_ALREADY_EXISTS', 400, [
-          { field: 'phone', message: 'Phone already exists' },
-        ]),
-        400,
-      );
-    }
-
-    if (dto.password !== dto.confirmPassword) {
-      throw new HttpException(
-        ErrorResponse.validationError([{ message: 'Password and confirm password do not match' }]),
-        400,
-      );
-    }
-
-    const passwordHash = await hashPassword(
-      dto.password,
-      this.configService.get<number>('bcrypt.saltRounds') as number,
-    );
-
-    const expiresInMinutes = Number(this.configService.get<number>('pendingRegistration.expiresInMinutes') ?? 15);
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000); // 15 phút
-
-    // Lưu pending registration (upsert) — CHƯA tạo Account
-    await this.pendingRegistrationModel.updateOne(
-      { email },
-      {
-        $set: {
-          email,
-          password: passwordHash,
-          firstName: dto.firstName.trim(),
-          lastName: dto.lastName.trim(),
-          phone: dto.phone.trim(),
-          address: dto.address.trim(),
-          dateOfBirth: new Date(dto.dateOfBirth),
-          sex: dto.sex,
-          expiresAt,
-        },
-      },
-      { upsert: true },
-    );
-
-    // Gửi OTP verify email (nếu đã gửi rồi thì fallback sang resend)
-    try {
-      await this.otpService.sendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
-    } catch (err: any) {
-      await this.otpService.reSendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
-    }
-
-    return new SuccessResponse(null, 'OTP sent successfully. Please verify to complete registration.', 200);
-  }
 
   async verifyRegister(regEmail: string, otp: string) {
     const email = (regEmail ?? '').trim().toLowerCase();
@@ -169,13 +96,17 @@ export class AccountsService {
   }
 
   async me(userId: string) {
-    const account = await this.accountModel.findById(userId).select({ password: 0 }).lean();
+    try {
+      const account = await this.accountModel.findById(userId).select({ password: 0 }).lean();
 
-    if (!account) {
-      throw new HttpException(new ErrorResponse('Account not found', 'ACCOUNT_NOT_FOUND', 404), 404);
+      if (!account) {
+        throw new HttpException(new ErrorResponse('Account not found', 'ACCOUNT_NOT_FOUND', 404), 404);
+      }
+
+      return new SuccessResponse(account, 'Account fetched successfully', 200);
+    } catch (error) {
+      throw new HttpException(new ErrorResponse('Profile information not available.', 'PROFILE_NOT_AVAILABLE', 404), 404);
     }
-
-    return new SuccessResponse(account, 'Account fetched successfully', 200);
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
@@ -554,7 +485,7 @@ export class AccountsService {
       await this.otpService.sendOtp({ email, purpose: OtpPurpose.FORGOT_PASSWORD });
     } catch (err) {
       // Nếu OTP đã được gửi (hoặc bất kỳ lỗi OTP nào khác), giữ nguyên phản hồi không tiết lộ
-      return new SuccessResponse(null, 'If the email exists, an OTP has been sent', 200);
+      return new SuccessResponse(null, 'Unable to send reset OTP email. Please try again later.', 200);
     }
 
     return new SuccessResponse(null, 'If the email exists, an OTP has been sent', 200);
