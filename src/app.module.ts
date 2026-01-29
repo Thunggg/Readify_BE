@@ -19,6 +19,7 @@ import { MediaModule } from './modules/media/media.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailModule } from './modules/mail/mail.module';
 import { OtpModule } from './modules/otp/otp.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
@@ -45,6 +46,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     MediaModule,
     MailModule,
     OtpModule,
+    WishlistModule,
     NotificationsModule,
     CategoriesModule,
     ReviewsModule,

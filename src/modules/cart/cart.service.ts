@@ -153,14 +153,37 @@ export class CartService {
     // Lấy lại cart items sau khi đã validate và update
     const cartItems = await this.cartModel
       .find({ userId: new Types.ObjectId(userId) })
-      .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
+      .populate('bookId', 'title authors isbn coverUrl thumbnailUrl basePrice pages publisher description categories publishedDate')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
 
+    // Transform to match frontend expectations: keep bookId as string, add book as object, add stock info
+    const transformedItems = await Promise.all(
+      cartItems.map(async (item) => {
+        const bookIdStr: string = (item.bookId as any)._id?.toString() || item.bookId.toString();
+        
+        // Fetch stock information for this book
+        const stock = await this.stockModel.findOne({ bookId: new Types.ObjectId(bookIdStr) }).lean().exec();
+        
+        return {
+          ...item,
+          bookId: bookIdStr,
+          book: typeof item.bookId === 'object' && item.bookId !== null ? item.bookId : undefined,
+          stock: stock
+            ? {
+                quantity: stock.quantity,
+                price: stock.price,
+                status: stock.status,
+              }
+            : undefined,
+        };
+      })
+    );
+
     return new SuccessResponse(
       {
-        items: cartItems,
+        items: transformedItems,
         validation: {
           updated: validationResult.updated,
           removed: validationResult.removed,
@@ -265,7 +288,7 @@ export class CartService {
         userId: new Types.ObjectId(userId),
         bookId: new Types.ObjectId(bookId),
       })
-      .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
+      .populate('bookId', 'title authors isbn coverUrl thumbnailUrl basePrice pages publisher description categories publishedDate')
       .lean()
       .exec();
 
@@ -273,7 +296,26 @@ export class CartService {
       throw new HttpException(ErrorResponse.notFound('Cart item not found'), HttpStatus.NOT_FOUND);
     }
 
-    return new SuccessResponse(cartItem, 'Cart item retrieved successfully');
+    const bookIdStr: string = (cartItem.bookId as any)._id?.toString() || cartItem.bookId.toString();
+    
+    // Fetch stock information
+    const stock = await this.stockModel.findOne({ bookId: new Types.ObjectId(bookIdStr) }).lean().exec();
+
+    // Transform to match frontend expectations
+    const transformedItem = {
+      ...cartItem,
+      bookId: bookIdStr,
+      book: typeof cartItem.bookId === 'object' && cartItem.bookId !== null ? cartItem.bookId : undefined,
+      stock: stock
+        ? {
+            quantity: stock.quantity,
+            price: stock.price,
+            status: stock.status,
+          }
+        : undefined,
+    };
+
+    return new SuccessResponse(transformedItem, 'Cart item retrieved successfully');
   }
 
   async toggleSelectItem(userId: string, bookId: string) {
@@ -358,11 +400,34 @@ export class CartService {
         userId: new Types.ObjectId(userId),
         isSelected: true as any,
       })
-      .populate('bookId', 'title author isbn coverUrl pages publisher description categories publishedDate')
+      .populate('bookId', 'title authors isbn coverUrl thumbnailUrl basePrice pages publisher description categories publishedDate')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
 
-    return new SuccessResponse(selectedItems, 'Selected cart items retrieved successfully');
+    // Transform to match frontend expectations and add stock info
+    const transformedItems = await Promise.all(
+      selectedItems.map(async (item) => {
+        const bookIdStr: string = (item.bookId as any)._id?.toString() || item.bookId.toString();
+        
+        // Fetch stock information
+        const stock = await this.stockModel.findOne({ bookId: new Types.ObjectId(bookIdStr) }).lean().exec();
+        
+        return {
+          ...item,
+          bookId: bookIdStr,
+          book: typeof item.bookId === 'object' && item.bookId !== null ? item.bookId : undefined,
+          stock: stock
+            ? {
+                quantity: stock.quantity,
+                price: stock.price,
+                status: stock.status,
+              }
+            : undefined,
+        };
+      })
+    );
+
+    return new SuccessResponse(transformedItems, 'Selected cart items retrieved successfully');
   }
 }
