@@ -133,8 +133,8 @@ export class AccountsService {
       );
     }
 
-    if (dto.firstName !== undefined) account.firstName = dto.firstName.trim();
-    if (dto.lastName !== undefined) account.lastName = dto.lastName.trim();
+    if (dto.firstName !== undefined) account.firstName = dto.firstName.trim().replace(/\s+/g, ' ');
+    if (dto.lastName !== undefined) account.lastName = dto.lastName.trim().replace(/\s+/g, ' ');
     if (dto.dateOfBirth !== undefined) account.dateOfBirth = dto.dateOfBirth;
     if (dto.phone !== undefined) account.phone = dto.phone;
     if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
@@ -387,6 +387,7 @@ export class AccountsService {
       [StaffSortBy.LAST_LOGIN_AT]: { lastLoginAt: sortOrder },
       [StaffSortBy.DATE_OF_BIRTH]: { dateOfBirth: sortOrder },
       [StaffSortBy.FULL_NAME]: { fullName: sortOrder },
+      
     };
 
     // Lấy sort stage từ map, mặc định sort theo CREATED_AT

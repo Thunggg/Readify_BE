@@ -9,7 +9,7 @@ import { AccountsModule } from './modules/accounts/accounts.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { StockModule } from './modules/stock/stock.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
-import { BookModule } from './modules/book/books.module';
+import { BookModule } from './modules/book/book.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 import { PromotionLogModule } from './modules/promotion-log/promotion-log.module';

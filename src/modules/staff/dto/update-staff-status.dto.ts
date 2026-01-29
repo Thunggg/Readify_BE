@@ -1,9 +1,12 @@
-import { IsInt, IsIn } from 'class-validator';
+import { IsInt, IsIn, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { AccountStatus } from '../constants/staff.enum';
+import type { AccountStatusValue } from '../constants/staff.enum';
 
 export class UpdateStaffStatusDto {
   @Type(() => Number)
-  @IsInt()
-  @IsIn([0, 1, 2]) // 0 inactive, 1 active, 2 not active email
-  status: number;
+  @IsEnum(AccountStatus, {
+    message: 'Status must be one of: 0 (INACTIVE), 1 (ACTIVE), -1 (BANNED), 2 (NOT_ACTIVE_EMAIL)',
+  })
+  status: AccountStatusValue;
 }
