@@ -8,7 +8,10 @@ import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // POST /auth/login
   @HttpCode(HttpStatus.OK)
@@ -19,19 +22,22 @@ export class AuthController {
     const { accessToken, refreshToken } = response.data;
 
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+    const refreshTokenTtl = this.configService.get<number>('jwt.refreshTokenExpiresIn') ?? 604800;
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 1200 * 60 * 1000, // 15 phút
+      sameSite: 'lax',
+      secure: false,
+      maxAge: accessTokenTtl * 1000,
       path: '/',
-    }); 
+    });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+      sameSite: 'lax',
+      secure: false,
+      maxAge: refreshTokenTtl * 1000,
       path: '/',
     });
 
@@ -45,6 +51,7 @@ export class AuthController {
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     const response = await this.authService.logout(req?.cookies?.accessToken as string);
     res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
     return response;
   }
 
@@ -56,11 +63,13 @@ export class AuthController {
 
     const { accessToken } = response.data;
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 15 * 60 * 1000, // 15 phút
+      sameSite: 'lax',
+      secure: false,
+      maxAge: accessTokenTtl * 1000,
       path: '/',
     });
 

@@ -36,10 +36,10 @@ export class BooksAdminController {
     return this.booksAdminService.publishBook(params.id);
   }
 
-  // @Patch(':id')
-  // updateBook(@Param() params: BookIdDto, @Body() dto: UpdateBookDto) {
-  //   return this.booksAdminService.updateBook(params.id, dto);
-  // }
+  @Patch(':id')
+  updateBook(@Param() params: BookIdDto, @Body() dto: UpdateBookDto) {
+    return this.booksAdminService.updateBook(params.id, dto);
+  }
 
   @Delete(':id')
   deleteBook(@Param() params: BookIdDto) {

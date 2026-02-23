@@ -3,8 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Book, BookSchema } from './schemas/book.schema';
 import { BooksAdminController } from './controllers/books.admin.controller';
 import { BooksPublicController } from './controllers/books.public.controller';
+import { AuthorsAdminController } from './controllers/authors.admin.controller';
 import { BooksAdminService } from './services/books.admin.service';
 import { BooksPublicService } from './services/books.public.service';
+import { AuthorsAdminService } from './services/authors.admin.service';
 import { Stock, StockSchema } from '../stock/schemas/stock.schema';
 import { Media, MediaSchema } from '../media/schemas/media.schema';
 import { Category, CategorySchema } from '../categories/schemas/category.schema';
@@ -22,7 +24,7 @@ import { Author, AuthorSchema } from './schemas/author.schema';
       { name: Supplier.name, schema: SupplierSchema },
     ]),
   ],
-  controllers: [BooksAdminController, BooksPublicController],
-  providers: [BooksAdminService, BooksPublicService],
+  controllers: [BooksAdminController, BooksPublicController, AuthorsAdminController],
+  providers: [BooksAdminService, BooksPublicService, AuthorsAdminService],
 })
 export class BookModule {}
