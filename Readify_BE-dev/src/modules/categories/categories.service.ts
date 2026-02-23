@@ -32,7 +32,7 @@ export class CategoriesService {
       );
     }
 
-    // Check if category name already exists
+    // Check if category name already exists.
     const existingCategory = await this.categoryModel.findOne({
       name: { $regex: new RegExp(`^${name}$`, 'i') }, // Case-insensitive
       isDeleted: { $ne: true },
