@@ -30,7 +30,7 @@ export class PromotionService {
     private readonly promotionModel: Model<PromotionDocument>,
     @InjectModel(Account.name)
     private readonly accountModel: Model<AccountDocument>,
-  ) {}
+  ) { }
 
   async getPromotionList(query: SearchPromotionDto, currentUser: string) {
     if (!Types.ObjectId.isValid(currentUser)) {
