@@ -9,12 +9,14 @@ import { Stock, StockSchema } from '../stock/schemas/stock.schema';
 import { Media, MediaSchema } from '../media/schemas/media.schema';
 import { Category, CategorySchema } from '../categories/schemas/category.schema';
 import { Supplier, SupplierSchema } from '../supplier/schemas/supplier.schema';
+import { Author, AuthorSchema } from './schemas/author.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Book.name, schema: BookSchema },
       { name: Stock.name, schema: StockSchema },
+      { name: Author.name, schema: AuthorSchema },
       { name: Media.name, schema: MediaSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Supplier.name, schema: SupplierSchema },
