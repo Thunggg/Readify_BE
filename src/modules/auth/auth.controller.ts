@@ -60,7 +60,7 @@ export class AuthController {
       secure: false, // true khi HTTPS
       maxAge: 1200 * 60 * 1000, // 15 phút
       path: '/',
-    }); 
+    });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -80,6 +80,7 @@ export class AuthController {
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     const response = await this.authService.logout(req?.cookies?.accessToken as string);
     res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
     return response;
   }
 
