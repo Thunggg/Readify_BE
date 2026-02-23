@@ -42,7 +42,7 @@ export class AccountsService {
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
-  ) {}
+  ) { }
 
   async register(dto: RegisterAccountDto) {
     const email = dto.email.trim().toLowerCase();
@@ -436,7 +436,11 @@ export class AccountsService {
 
     // Map các trường sort với hướng sort tương ứng
     const sortMap: Record<string, Record<string, 1 | -1>> = {
+<<<<<<< HEAD
       [StaffSortBy.CREATED_AT]: { createdAt: -1  },
+=======
+      [StaffSortBy.CREATED_AT]: { createdAt: 1 },
+>>>>>>> e245a6b (refactor: clean up accounts and auth modules)
       [StaffSortBy.EMAIL]: { email: sortOrder },
       [StaffSortBy.LAST_LOGIN_AT]: { lastLoginAt: sortOrder },
       [StaffSortBy.DATE_OF_BIRTH]: { dateOfBirth: sortOrder },
@@ -651,9 +655,5 @@ export class AccountsService {
 
     const { password, ...accountData } = account.toObject();
     return new SuccessResponse(accountData, 'Password reset successfully', 200);
-  }
-
-  async uploadAvatar(file: Express.Multer.File) {
-    console.log(file);
   }
 }

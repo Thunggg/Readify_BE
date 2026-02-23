@@ -21,37 +21,11 @@ export class StockService {
 
   async getStockList() {
     // LẤY DANH SÁCH TỒN KHO kèm thông tin sách
-    // Dùng aggregation thay vì populate vì Book model chưa được đăng ký
     try {
-      const stocks = await this.stockModel.aggregate([
-        {
-          // $lookup: JOIN với collection 'books' (giống LEFT JOIN trong SQL)
-          $lookup: {
-            from: 'books', // Collection cần join
-            localField: 'bookId', // Field trong stocks
-            foreignField: '_id', // Field trong books
-            as: 'book', // Tên field chứa kết quả join (mảng)
-          },
-        },
-        // $unwind: Chuyển mảng book thành object (vì mỗi stock chỉ có 1 book)
-        // preserveNullAndEmptyArrays: true => Giữ stock ngay cả khi không tìm thấy book
-        { $unwind: { path: '$book', preserveNullAndEmptyArrays: true } },
-        {
-          // $project: Chọn các field cần trả về (1 = hiển thị, 0 = ẩn)
-          $project: {
-            bookId: 1,
-            quantity: 1,
-            location: 1,
-            price: 1,
-            batch: 1,
-            lastUpdated: 1,
-            status: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            book: 1, // Thông tin sách từ $lookup
-          },
-        },
-      ]);
+      const stocks = await this.stockModel
+        .find()
+        .populate('bookId') // Tự động join với collection books qua bookId
+        .exec();
 
       return new SuccessResponse(stocks, 'Successfully fetched stock list');
     } catch (err) {
@@ -70,39 +44,16 @@ export class StockService {
     }
 
     try {
-      const stocks = await this.stockModel.aggregate([
-        // $match: Lọc document theo điều kiện (giống WHERE trong SQL)
-        { $match: { _id: new Types.ObjectId(id) } },
-        {
-          $lookup: {
-            from: 'books',
-            localField: 'bookId',
-            foreignField: '_id',
-            as: 'book',
-          },
-        },
-        { $unwind: { path: '$book', preserveNullAndEmptyArrays: true } },
-        {
-          $project: {
-            bookId: 1,
-            quantity: 1,
-            location: 1,
-            price: 1,
-            batch: 1,
-            lastUpdated: 1,
-            status: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            book: 1,
-          },
-        },
-      ]);
+      const stock = await this.stockModel
+        .findById(id)
+        .populate('bookId') // Tự động join với collection books
+        .exec();
 
-      if (!stocks || stocks.length === 0) {
+      if (!stock) {
         throw new HttpException(ErrorResponse.notFound('Stock not found'), HttpStatus.NOT_FOUND);
       }
 
-      return new SuccessResponse(stocks[0], 'Successfully fetched stock detail');
+      return new SuccessResponse(stock, 'Successfully fetched stock detail');
     } catch (err) {
       if (err instanceof HttpException) throw err;
       this.logger.error('Error fetching stock detail: ' + String(err));
@@ -187,6 +138,7 @@ export class StockService {
               isbn,
               message: `Validation failed: ${errorMessages}`,
             });
+            // Tiếp tục với dòng kế tiếp
             continue;
           }
 
@@ -197,7 +149,7 @@ export class StockService {
             result.errors.push({
               row: rowNum,
               isbn,
-              message: `Không tìm thấy sách với ISBN: ${isbn}`,
+              message: `Book not found with ISBN: ${isbn}`,
             });
             continue;
           }
@@ -253,26 +205,18 @@ export class StockService {
   async exportStockToExcel(): Promise<Buffer> {
     try {
       // LẤY TOÀN BỘ STOCK kèm thông tin sách để export
-      // Dùng aggregation để join với books collection
-      const stocks = await this.stockModel.aggregate([
-        {
-          $lookup: {
-            from: 'books',
-            localField: 'bookId',
-            foreignField: '_id',
-            as: 'book',
-          },
-        },
-        { $unwind: { path: '$book', preserveNullAndEmptyArrays: true } },
-      ]);
+      const stocks = await this.stockModel
+        .find()
+        .populate('bookId') // Tự động join với collection books
+        .exec();
 
       // CHUẨN BỊ DỮ LIỆU CHO EXCEL
       // Map data sang format dễ đọc với tên cột rõ ràng
       const excelData = stocks.map((stock: any) => ({
-        ISBN: stock.book?.isbn || '', // Mã ISBN từ book
-        'Book Title': stock.book?.title || '', // Tên sách
-        Author: stock.book?.author || '', // Tác giả
-        Publisher: stock.book?.publisher || '', // Nhà xuất bản
+        ISBN: stock.bookId?.isbn || '', // Mã ISBN từ book
+        'Book Title': stock.bookId?.title || '', // Tên sách
+        Author: stock.bookId?.authors?.[0] || '', // Tác giả đầu tiên
+        Publisher: stock.bookId?.publisherId || '', // Publisher ID
         Quantity: stock.quantity || 0, // Số lượng tồn
         Location: stock.location || '', // Vị trí kho
         Price: stock.price || 0, // Giá

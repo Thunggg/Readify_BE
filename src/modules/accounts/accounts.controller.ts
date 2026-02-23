@@ -38,7 +38,7 @@ export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
     private readonly otpService: OtpService,
-  ) {}
+  ) { }
 
   private setOtpCookies(res: Response, email: string, purpose: 'VERIFY_EMAIL' | 'FORGOT_PASSWORD') {
     res.cookie('otpEmail', email, {
@@ -181,11 +181,5 @@ export class AccountsController {
     this.clearOtpCookies(res);
 
     return response;
-  }
-
-  @Post('upload-avatar')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadAvatar(@UploadedFile() file: Express.Multer.File) {
-    return this.accountsService.uploadAvatar(file);
   }
 }
