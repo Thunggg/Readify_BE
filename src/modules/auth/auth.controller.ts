@@ -27,9 +27,9 @@ export class AuthController {
 
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: accessTokenTtl * 1000,
+      sameSite: 'lax', // dev OK
+      secure: false, // true khi HTTPS
+      maxAge: 10 * 1000, // 10 giây
       path: '/',
     });
 
@@ -58,8 +58,8 @@ export class AuthController {
   //POST /auth/refresh-token
   @HttpCode(HttpStatus.OK)
   @Post('refresh-token')
-  async refreshToken(@Body() dto: RefreshTokenDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.refreshToken(dto.refreshToken);
+  async refreshToken(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const response = await this.authService.refreshToken(req?.cookies?.refreshToken as string);
 
     const { accessToken } = response.data;
 
