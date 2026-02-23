@@ -5,6 +5,9 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ConfigService } from '@nestjs/config';
+import { RegisterAccountDto } from './dto/register-account.dto';
+import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
+import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Controller('auth')
 export class AuthController {
@@ -58,8 +61,8 @@ export class AuthController {
   //POST /auth/refresh-token
   @HttpCode(HttpStatus.OK)
   @Post('refresh-token')
-  async refreshToken(@Body() dto: RefreshTokenDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.refreshToken(dto.refreshToken);
+  async refreshToken(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const response = await this.authService.refreshToken(req?.cookies?.refreshToken as string);
 
     const { accessToken } = response.data;
 

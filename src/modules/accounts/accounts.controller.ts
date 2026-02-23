@@ -15,7 +15,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { RegisterAccountDto } from './dto/register-account.dto';
 import { AccountsService } from './accounts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -38,7 +37,7 @@ export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
     private readonly otpService: OtpService,
-  ) {}
+  ) { }
 
   private setOtpCookies(res: Response, email: string, purpose: 'VERIFY_EMAIL' | 'FORGOT_PASSWORD') {
     res.cookie('otpEmail', email, {
@@ -66,16 +65,6 @@ export class AccountsController {
     if (raw === 'VERIFY_EMAIL') return OtpPurpose.VERIFY_EMAIL;
     if (raw === 'FORGOT_PASSWORD') return OtpPurpose.FORGOT_PASSWORD;
     throw new BadRequestException('Invalid otpPurpose cookie');
-  }
-
-  @Post('register')
-  async register(@Body() dto: RegisterAccountDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.accountsService.register(dto);
-
-    const email = dto.email.trim().toLowerCase();
-    this.setOtpCookies(res, email, OtpPurpose.VERIFY_EMAIL);
-
-    return response;
   }
 
   @Post('otp/resend')
@@ -181,11 +170,5 @@ export class AccountsController {
     this.clearOtpCookies(res);
 
     return response;
-  }
-
-  @Post('upload-avatar')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadAvatar(@UploadedFile() file: Express.Multer.File) {
-    return this.accountsService.uploadAvatar(file);
   }
 }
