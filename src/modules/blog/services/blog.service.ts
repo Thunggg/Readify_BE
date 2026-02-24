@@ -17,7 +17,7 @@ export class BlogService {
   ) {}
 
   /**
-   * Lấy danh sách bài viết (public: chỉ published, admin: theo status)
+   * Get list of articles (public: only published, admin: according to status)
    */
   async findAll(query: BlogQueryDto) {
     const filter: Record<string, unknown> = { deletedAt: null };
@@ -94,11 +94,11 @@ export class BlogService {
       .limit(limit)
       .lean();
 
-    return new PaginatedResponse(posts, { page, limit, total }, 'Lấy danh sách bài viết thành công');
+    return new PaginatedResponse(posts, { page, limit, total }, 'Successfully retrieved list of articles');
   }
 
   /**
-   * Lấy chi tiết bài viết theo slug (public)
+   * Get article details by slug (public)
    */
   async findBySlug(slug: string) {
     const post = await this.blogPostModel
@@ -109,26 +109,26 @@ export class BlogService {
       .lean();
 
     if (!post) {
-      throw new NotFoundException('Bài viết không tồn tại');
+      throw new NotFoundException('Article does not exist');
     }
 
     // Tăng view count (fire and forget)
     void this.blogPostModel.updateOne({ _id: post._id }, { $inc: { viewCount: 1 } }).exec();
 
-    return new SuccessResponse(post, 'Lấy chi tiết bài viết thành công');
+    return new SuccessResponse(post, 'Successfully retrieved article details');
   }
 
   /**
-   * Lấy bài viết liên quan (cùng category hoặc cùng tags)
+   * Get related articles (same category or same tags)
    */
   async getRelatedPosts(postId: string, limit: number = 4) {
     if (!Types.ObjectId.isValid(postId)) {
-      return new SuccessResponse([], 'Không tìm thấy bài viết liên quan');
+      return new SuccessResponse([], 'No related articles found');
     }
 
     const post = await this.blogPostModel.findById(postId).lean();
     if (!post) {
-      return new SuccessResponse([], 'Không tìm thấy bài viết liên quan');
+      return new SuccessResponse([], 'No related articles found');
     }
 
     const orConditions: any[] = [{ category: post.category }];
@@ -160,11 +160,11 @@ export class BlogService {
       .limit(limit)
       .lean();
 
-    return new SuccessResponse(relatedPosts, 'Lấy bài viết liên quan thành công');
+    return new SuccessResponse(relatedPosts, 'Successfully retrieved related articles');
   }
 
   /**
-   * Lấy tất cả blog categories (public)
+   * Get all blog categories (public)
    */
   async getCategories() {
     const categories = await this.categoryModel
@@ -173,11 +173,11 @@ export class BlogService {
       .sort({ name: 1 })
       .lean();
 
-    return new SuccessResponse(categories, 'Lấy danh mục blog thành công');
+    return new SuccessResponse(categories, 'Successfully retrieved blog categories');
   }
 
   /**
-   * Tạo bài viết mới (Admin/Staff)
+   * Create new article (Admin/Staff)
    */
   async create(createBlogPostDto: CreateBlogPostDto, authorId: string) {
     let slug = this.generateSlug(createBlogPostDto.title);
@@ -217,16 +217,16 @@ export class BlogService {
       .populate('author', 'firstName lastName avatarUrl')
       .lean();
 
-    return new SuccessResponse(populated, 'Tạo bài viết thành công');
+    return new SuccessResponse(populated, 'Successfully created article');
   }
 
   /**
-   * Cập nhật bài viết
+   * Update article
    */
   async update(slug: string, updateBlogPostDto: UpdateBlogPostDto) {
     const existingPost = await this.blogPostModel.findOne({ slug });
     if (!existingPost) {
-      throw new NotFoundException('Bài viết không tồn tại');
+      throw new NotFoundException('Article does not exist');
     }
 
     const updateData: Record<string, unknown> = { ...updateBlogPostDto };
@@ -261,22 +261,22 @@ export class BlogService {
       .populate('author', 'firstName lastName avatarUrl')
       .lean();
 
-    return new SuccessResponse(updatedPost, 'Cập nhật bài viết thành công');
+    return new SuccessResponse(updatedPost, 'Successfully updated article');
   }
 
   /**
-   * Xóa mềm bài viết
+   * Soft delete article
    */
   async delete(slug: string) {
     const post = await this.blogPostModel.findOne({ slug });
     if (!post) {
-      throw new NotFoundException('Bài viết không tồn tại');
+      throw new NotFoundException('Article does not exist');
     }
 
     await this.blogPostModel.updateOne({ slug }, { deletedAt: new Date() });
     await this.categoryModel.findByIdAndUpdate(post.category, { $inc: { postCount: -1 } });
 
-    return new SuccessResponse(null, 'Xóa bài viết thành công');
+    return new SuccessResponse(null, 'Successfully deleted article');
   }
 
   private generateSlug(title: string): string {
