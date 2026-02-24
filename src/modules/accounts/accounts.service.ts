@@ -12,6 +12,7 @@ import {
   AccountRole,
   AccountStatus,
   AccountStatusValue,
+  Pagination,
   SexValue,
   SortOrder,
   SortOrderValue,
@@ -41,7 +42,7 @@ export class AccountsService {
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
-  ) { }
+  ) {}
 
   async verifyRegister(regEmail: string, otp: string) {
     const email = (regEmail ?? '').trim().toLowerCase();
@@ -105,7 +106,10 @@ export class AccountsService {
 
       return new SuccessResponse(account, 'Account fetched successfully', 200);
     } catch (error) {
-      throw new HttpException(new ErrorResponse('Profile information not available.', 'PROFILE_NOT_AVAILABLE', 404), 404);
+      throw new HttpException(
+        new ErrorResponse('Profile information not available.', 'PROFILE_NOT_AVAILABLE', 404),
+        404,
+      );
     }
   }
 
@@ -329,47 +333,46 @@ export class AccountsService {
     return new SuccessResponse(account, 'Get account detail successfully', 200);
   }
 
-  private buildAccountFileter(param: {
+  private buildAccountFileter(params: {
     q?: string;
     status?: AccountStatusValue[];
     isDeleted?: boolean;
     sex?: SexValue[];
-  }) {
-    const { q, status, isDeleted, sex } = param;
+  }): QueryFilter<AccountDocument> {
+    const { q, status, isDeleted, sex } = params;
 
     const filter: QueryFilter<AccountDocument> = {
       role: {
         $in: [AccountRole.USER],
-        $ne: AccountRole.ADMIN,
       },
+
+      // Mặc định không lấy account đã xoá mềm.
+      // Nếu isDeleted=true thì chỉ lấy account đã xoá.
+      isDeleted: isDeleted === true ? true : { $ne: true },
     };
 
-    // Xử lý trạng thái isDeleted
-    if (isDeleted === true) {
-      filter.isDeleted = true;
-    } else {
-      filter.isDeleted = { $ne: true };
-    }
-
-    // Filter theo status (array)
-    if (status !== undefined && Array.isArray(status) && status.length > 0) {
+    // Filter theo status (nếu có)
+    if (Array.isArray(status) && status.length > 0) {
       filter.status = { $in: status };
     }
 
-    // Filter theo sex (array)
-    if (sex !== undefined && Array.isArray(sex) && sex.length > 0) {
+    // Filter theo sex (nếu có)
+    if (Array.isArray(sex) && sex.length > 0) {
       filter.sex = { $in: sex };
     }
 
-    //Filter theo từ khóa tìm kiếm
-    if (q) {
-      // value	Boolean(value) => true nếu value không phải là falsey (false, 0, null, undefined, NaN, "")
-      const searchKeywords = q.trim().split(/\s+/).filter(Boolean).slice(0, 5); // Tách chuỗi thành các từ khóa riêng lẻ, tối đa 5 từ
-      const searchFields = ['firstName', 'lastName', 'email', 'phone'] as const;
 
-      filter.$and = searchKeywords.map((kw) => ({
-        $or: searchFields.map((f) => ({
-          [f]: { $regex: kw, $options: 'i' },
+
+    // Filter theo từ khoá tìm kiếm (q): ["nguyen", "", "", "van", "", "a"]
+    if (q && q.trim().length > 0) {
+      const keywords = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
+      const fields = ['firstName', 'lastName', 'email', 'phone'] as const;
+
+      // AND giữa các keyword, OR giữa các field
+      // AND giữa các keyword và OR giữa các field
+      filter.$and = keywords.map((keyword) => ({
+        $or: fields.map((field) => ({
+          [field]: { $regex: keyword, $options: 'i' },
         })),
       }));
     }
@@ -378,25 +381,32 @@ export class AccountsService {
   }
 
   private buildSortStage(sortBy: string, order: SortOrderValue): PipelineStage {
-    const sortOrder = order === SortOrder.ASC ? 1 : -1;
+    const direction: 1 | -1 = order === SortOrder.ASC ? 1 : -1;
 
-    // Map các trường sort với hướng sort tương ứng
-    const sortMap: Record<string, Record<string, 1 | -1>> = {
-<<<<<<< HEAD
-      [StaffSortBy.CREATED_AT]: { createdAt: -1  },
-=======
-      [StaffSortBy.CREATED_AT]: { createdAt: 1 },
->>>>>>> e245a6b (refactor: clean up accounts and auth modules)
-      [StaffSortBy.EMAIL]: { email: sortOrder },
-      [StaffSortBy.LAST_LOGIN_AT]: { lastLoginAt: sortOrder },
-      [StaffSortBy.DATE_OF_BIRTH]: { dateOfBirth: sortOrder },
-      [StaffSortBy.FULL_NAME]: { fullName: sortOrder },
-      
-    };
+    let sortStage: Record<string, 1 | -1>;
+    switch (sortBy) {
+      case StaffSortBy.CREATED_AT:
+        sortStage = { createdAt: 1 };
+        break;
+      case StaffSortBy.EMAIL:
+        sortStage = { email: direction };
+        break;
+      case StaffSortBy.LAST_LOGIN_AT:
+        sortStage = { lastLoginAt: direction };
+        break;
+      case StaffSortBy.DATE_OF_BIRTH:
+        sortStage = { dateOfBirth: direction };
+        break;
+      case StaffSortBy.FULL_NAME:
+        sortStage = { fullName: direction };
+        break;
+      default:
+        // Nếu sortBy không hợp lệ thì fallback về createdAt
+        sortStage = { createdAt: -1 };
+        break;
+    }
 
-    // Lấy sort stage từ map, mặc định sort theo CREATED_AT
-    const sortStage = sortMap[sortBy] || { createdAt: -1 };
-
+    // Luôn thêm _id để ổn định thứ tự khi dữ liệu bị trùng key sort
     return { $sort: { ...sortStage, _id: 1 } };
   }
 
@@ -408,9 +418,10 @@ export class AccountsService {
     limit: number;
   }): PipelineStage[] {
     const { filter, sortBy, order, skip, limit } = params;
+
     const pipeline: PipelineStage[] = [{ $match: filter }];
 
-    // Thêm fullName field ảo nếu cần sort theo fullName
+    // Nếu sort theo fullName thì cần tạo field fullName (ảo) để sort
     if (sortBy === StaffSortBy.FULL_NAME) {
       pipeline.push({
         $addFields: {
@@ -421,12 +432,7 @@ export class AccountsService {
       });
     }
 
-    // xây dựng sort stage
-    const sortStage = this.buildSortStage(sortBy, order);
-    pipeline.push(sortStage);
-
-    // Thêm pagination
-    pipeline.push({ $skip: skip }, { $limit: limit });
+    pipeline.push(this.buildSortStage(sortBy, order), { $skip: skip }, { $limit: limit });
 
     return pipeline;
   }
@@ -439,30 +445,30 @@ export class AccountsService {
       isDeleted,
       sortBy = StaffSortBy.CREATED_AT,
       order = SortOrder.DESC,
-      page = 1,
-      limit = 10,
+      page = Pagination.DEFAULT_PAGE,
+      limit = Pagination.DEFAULT_LIMIT,
     } = query;
 
     // PAGINATION
-    const validPage = Math.max(1, page);
-    const validLimit = Math.min(50, Math.max(1, limit));
-    const skip = (validPage - 1) * validLimit;
+    const pageNumber = Math.max(Pagination.MIN_PAGE, page);
+    const pageSize = Math.min(Pagination.MAX_LIMIT, Math.max(Pagination.MIN_LIMIT, limit));
+    const skip = (pageNumber - 1) * pageSize;
 
     // FILTER
     const filter = this.buildAccountFileter({ q, status, isDeleted, sex });
 
     // SORT
-    const aggregationPipeline = this.buildAggregationPipeline({ filter, sortBy, order, skip, limit: validLimit });
+    const pipeline = this.buildAggregationPipeline({ filter, sortBy, order, skip, limit: pageSize });
 
     // QUERY
     const [items, total] = await Promise.all([
-      this.accountModel.aggregate(aggregationPipeline),
+      this.accountModel.aggregate(pipeline),
       this.accountModel.countDocuments(filter),
     ]);
 
     return new PaginatedResponse(
       items,
-      { page: validPage, limit: validLimit, total },
+      { page: pageNumber, limit: pageSize, total },
       'Account list retrieved successfully',
     );
   }
