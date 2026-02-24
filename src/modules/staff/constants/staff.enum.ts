@@ -46,6 +46,18 @@ export const SortOrder = {
 
 export type SortOrderValue = (typeof SortOrder)[keyof typeof SortOrder];
 
+// ===== PAGINATION =====
+export const Pagination = {
+  MIN_PAGE: 1,
+  DEFAULT_PAGE: 1,
+
+  MIN_LIMIT: 1,
+  DEFAULT_LIMIT: 10,
+  MAX_LIMIT: 50,
+} as const;
+
+export type PaginationValue = (typeof Pagination)[keyof typeof Pagination];
+
 // ===== SEX =====
 export const Sex = {
   UNKNOWN: 0,
