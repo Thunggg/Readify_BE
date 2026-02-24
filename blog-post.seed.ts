@@ -1,12 +1,6 @@
 import mongoose, { Schema, Types } from 'mongoose'
 
 /**
- * ===== CONFIG =====
- * Thay bằng connection string của bạn
- */
-const MONGO_URI = 'mongodb+srv://tptai1314_db_user:J8OBdXqjDh2nSTzU@Readify.dyrbkjw.mongodb.net/Readify?retryWrites=true&w=majority&appName=BookCapyStore'
-
-/**
  * ===== Schema Definition =====
  */
 const BlogPostSchema = new Schema(
