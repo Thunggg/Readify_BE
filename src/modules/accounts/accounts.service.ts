@@ -361,8 +361,6 @@ export class AccountsService {
       filter.sex = { $in: sex };
     }
 
-
-
     // Filter theo từ khoá tìm kiếm (q): ["nguyen", "", "", "van", "", "a"]
     if (q && q.trim().length > 0) {
       const keywords = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
@@ -608,5 +606,52 @@ export class AccountsService {
 
     const { password, ...accountData } = account.toObject();
     return new SuccessResponse(accountData, 'Password reset successfully', 200);
+  }
+
+  async getSessions(userId: string, currentToken?: string) {
+    const sessions = await this.refreshTokenModel
+      .find({ userId })
+      .sort({ lastUsedAt: -1 })
+      .select('_id userAgent ipAddress lastUsedAt createdAt token');
+
+    return sessions.map((session) => ({
+      id: session._id,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      lastUsedAt: session.lastUsedAt,
+      createdAt: session.createdAt,
+      isCurrent: session.token === currentToken,
+    }));
+  }
+
+  async revokeSession(sessionId: string, userId: string, currentToken?: string) {
+    if (!Types.ObjectId.isValid(sessionId)) {
+      throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
+    }
+
+    const session = await this.refreshTokenModel
+      .findOne({ _id: sessionId, userId })
+      .select('token')
+      .lean();
+
+    if (!session) {
+      throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
+    }
+
+    const isCurrent = Boolean(currentToken) && session.token === currentToken;
+
+    await this.refreshTokenModel.deleteOne({ _id: sessionId, userId });
+
+    return isCurrent;
+  }
+
+  async revokeAllSessions(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new HttpException(ErrorResponse.badRequest('Invalid account id'), HttpStatus.BAD_REQUEST);
+    }
+
+    const result = await this.refreshTokenModel.deleteMany({ userId });
+
+    return { revokedCount: result.deletedCount ?? 0 };
   }
 }

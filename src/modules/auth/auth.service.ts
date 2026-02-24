@@ -26,7 +26,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
-  ) { }
+  ) {}
 
   async register(dto: RegisterAccountDto) {
     const email = dto.email.trim().toLowerCase();
@@ -99,7 +99,7 @@ export class AuthService {
     return new SuccessResponse(null, 'OTP sent successfully. Please verify to complete registration.', 200);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, { userAgent, ipAddress }: { userAgent: string; ipAddress: string }) {
     const email = dto.email.trim().toLowerCase();
     const password = dto.password;
 
@@ -141,6 +141,9 @@ export class AuthService {
       token: refreshToken,
       createdAt: new Date(),
       updatedAt: new Date(),
+      userAgent,
+      ipAddress,
+      lastUsedAt: new Date(),
     });
 
     return new SuccessResponse({ accessToken, refreshToken }, 'Login successful', 200);
