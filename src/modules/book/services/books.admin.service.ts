@@ -132,12 +132,16 @@ export class BooksAdminService {
           currency: 1,
           publisherId: 1,
           categoryIds: 1,
+          authors: 1,
           status: 1,
           isDeleted: 1,
           soldCount: 1,
           createdAt: 1,
           updatedAt: 1,
         })
+        .populate('categoryIds', 'name slug')
+        .populate('publisherId', 'name')
+        .populate('authors', 'name slug')
         .lean(),
 
       this.bookModel.countDocuments(filter),
@@ -273,13 +277,37 @@ export class BooksAdminService {
         createdAt: 1,
         updatedAt: 1,
       })
+      .populate('publisherId', 'name')
+      .populate('categoryIds', 'name slug')
+      .populate('authors', 'name slug')
+      .populate('images', 'url')
       .lean();
 
     if (!book) {
       throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
     }
 
-    return new SuccessResponse(book, 'Successfully retrieved the book details for the dashboard');
+    // Fetch stock info for this book
+    const stock = await this.stockModel
+      .findOne({ bookId: new Types.ObjectId(id) })
+      .select({ quantity: 1, location: 1, price: 1, batch: 1, status: 1, lastUpdated: 1 })
+      .lean();
+
+    const result = {
+      ...book,
+      stock: stock
+        ? {
+            quantity: stock.quantity ?? 0,
+            location: stock.location ?? '',
+            price: stock.price,
+            batch: stock.batch,
+            status: stock.status ?? 'available',
+            lastUpdated: stock.lastUpdated,
+          }
+        : null,
+    };
+
+    return new SuccessResponse(result, 'Successfully retrieved the book details for the dashboard');
   }
 
   /**
@@ -550,255 +578,304 @@ export class BooksAdminService {
     }
   }
 
-  // async updateBook(id: string, dto: UpdateBookDto, staffId?: string) {
-  //   if (!Types.ObjectId.isValid(id)) {
-  //     throw new HttpException(
-  //       ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
-  //       HttpStatus.BAD_REQUEST,
-  //     );
-  //   }
+  async updateBook(id: string, dto: UpdateBookDto) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-  //   const session = await this.connection.startSession();
+    const session = await this.connection.startSession();
 
-  //   try {
-  //     let updatedBook: Book | null = null;
+    try {
+      let updatedBook: Book | null = null;
 
-  //     await session.withTransaction(async () => {
-  //       // ===== 1) Load book (NO lean) =====
-  //       const book = await this.bookModel.findById(id).session(session);
-  //       if (!book) {
-  //         throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
-  //       }
-  //       if (book.isDeleted) {
-  //         throw new HttpException(
-  //           ErrorResponse.validationError([{ field: 'id', message: 'Book is deleted' }]),
-  //           HttpStatus.BAD_REQUEST,
-  //         );
-  //       }
+      await session.withTransaction(async () => {
+        // ===== 1) Load book (NO lean) =====
+        const book = await this.bookModel.findById(id).session(session);
+        if (!book) {
+          throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
+        }
+        if (book.isDeleted) {
+          throw new HttpException(
+            ErrorResponse.validationError([{ field: 'id', message: 'Book is deleted' }]),
+            HttpStatus.BAD_REQUEST,
+          );
+        }
 
-  //       // ===== 2) Update basic fields =====
-  //       if (dto.title?.trim()) book.title = dto.title.trim();
-  //       if (dto.subtitle !== undefined) book.subtitle = dto.subtitle?.trim();
-  //       if (dto.description !== undefined) book.description = dto.description?.trim();
-  //       // if (dto.authors !== undefined) book.authors = dto.authors;
-  //       if (dto.language !== undefined) book.language = dto.language?.trim();
-  //       if (dto.publishDate !== undefined) book.publishDate = dto.publishDate;
-  //       if (dto.pageCount !== undefined) book.pageCount = dto.pageCount;
-  //       if (dto.basePrice !== undefined) book.basePrice = dto.basePrice;
-  //       if (dto.currency !== undefined) book.currency = dto.currency?.trim() || 'VND';
-  //       if (dto.status !== undefined) book.status = dto.status;
-  //       if (dto.tags !== undefined) book.tags = dto.tags;
+        // ===== 2) Update basic fields =====
+        if (dto.title?.trim()) book.title = dto.title.trim();
+        if (dto.subtitle !== undefined) book.subtitle = dto.subtitle?.trim();
+        if (dto.description !== undefined) book.description = dto.description?.trim();
+        if (dto.language !== undefined) book.language = dto.language?.trim() as any;
+        if (dto.publishDate !== undefined) book.publishDate = dto.publishDate;
+        if (dto.pageCount !== undefined) book.pageCount = dto.pageCount;
+        if (dto.basePrice !== undefined) book.basePrice = dto.basePrice;
+        if (dto.currency !== undefined) book.currency = (dto.currency?.trim() || 'VND') as any;
+        if (dto.status !== undefined) book.status = dto.status;
+        if (dto.tags !== undefined) book.tags = dto.tags;
 
-  //       // ===== 3) Slug handling =====
-  //       if (dto.slug?.trim() || dto.title?.trim()) {
-  //         const slugSource = dto.slug?.trim() || dto.title!.trim();
-  //         const slug = slugSource
-  //           .toLowerCase()
-  //           .normalize('NFD')
-  //           .replace(/[\u0300-\u036f]/g, '')
-  //           .replace(/[^a-z0-9]+/g, '-')
-  //           .replace(/^-+|-+$/g, '')
-  //           .replace(/-+/g, '-');
+        // ===== 3) Slug handling =====
+        if (dto.slug?.trim() || dto.title?.trim()) {
+          const slugSource = dto.slug?.trim() || dto.title!.trim();
+          const slug = this.generateSlug(slugSource);
 
-  //         if (!slug) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'slug', message: 'Cannot generate slug' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+          if (!slug) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'slug', message: 'Cannot generate slug' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         if (slug !== book.slug) {
-  //           const exists = await this.bookModel.exists({
-  //             slug,
-  //             isDeleted: false,
-  //             _id: { $ne: book._id },
-  //           });
-  //           if (exists) {
-  //             throw new HttpException(
-  //               ErrorResponse.validationError([{ field: 'slug', message: 'Slug already exists' }]),
-  //               HttpStatus.BAD_REQUEST,
-  //             );
-  //           }
-  //           book.slug = slug;
-  //         }
-  //       }
+          if (slug !== book.slug) {
+            const exists = await this.bookModel.exists({
+              slug,
+              isDeleted: false,
+              _id: { $ne: book._id },
+            });
+            if (exists) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'slug', message: 'Slug already exists' }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+            book.slug = slug;
+          }
+        }
 
-  //       // ===== 3.1) Validate categoryIds if provided =====
-  //       if (dto.categoryIds !== undefined) {
-  //         if (!dto.categoryIds?.length) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'categoryIds', message: 'categoryIds cannot be empty' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+        // ===== 3.1) Validate categoryIds if provided =====
+        if (dto.categoryIds !== undefined) {
+          if (!dto.categoryIds?.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'categoryIds cannot be empty' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         // Check for duplicate categoryIds
-  //         const uniqueCategoryIds = [...new Set(dto.categoryIds)];
-  //         if (uniqueCategoryIds.length !== dto.categoryIds.length) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'categoryIds', message: 'Duplicate categoryIds detected' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+          const uniqueCategoryIds = [...new Set(dto.categoryIds)];
+          if (uniqueCategoryIds.length !== dto.categoryIds.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'Duplicate categoryIds detected' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         const categoryIds = dto.categoryIds.map((id) => {
-  //           if (!Types.ObjectId.isValid(id)) {
-  //             throw new HttpException(
-  //               ErrorResponse.validationError([{ field: 'categoryIds', message: `Invalid categoryId: ${id}` }]),
-  //               HttpStatus.BAD_REQUEST,
-  //             );
-  //           }
-  //           return new Types.ObjectId(id);
-  //         });
+          const categoryIds = dto.categoryIds.map((cid) => {
+            if (!Types.ObjectId.isValid(cid)) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'categoryIds', message: `Invalid categoryId: ${cid}` }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+            return new Types.ObjectId(cid);
+          });
 
-  //         // Validate categories exist and are not deleted
-  //         const categories = await this.categoryModel
-  //           .find({ _id: { $in: categoryIds } })
-  //           .select({ _id: 1, isDeleted: 1 })
-  //           .session(session)
-  //           .lean();
+          const categories = await this.categoryModel
+            .find({ _id: { $in: categoryIds } })
+            .select({ _id: 1, isDeleted: 1 })
+            .session(session)
+            .lean();
 
-  //         if (categories.length !== categoryIds.length) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories not found' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+          if (categories.length !== categoryIds.length) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories not found' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         const deletedCategory = categories.find((c) => c.isDeleted === true);
-  //         if (deletedCategory) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories are deleted' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+          const deletedCategory = categories.find((c) => c.isDeleted === true);
+          if (deletedCategory) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'categoryIds', message: 'One or more categories are deleted' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         book.categoryIds = categoryIds;
-  //       }
+          book.categoryIds = categoryIds;
+        }
 
-  //       // ===== 3.2) Validate publisherId if provided =====
-  //       if (dto.publisherId !== undefined) {
-  //         if (!Types.ObjectId.isValid(dto.publisherId)) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'publisherId', message: 'Invalid publisherId' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+        // ===== 3.2) Validate publisherId if provided =====
+        if (dto.publisherId !== undefined) {
+          if (!Types.ObjectId.isValid(dto.publisherId)) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publisherId', message: 'Invalid publisherId' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         // Validate publisher (supplier) exists and is not deleted
-  //         const publisher = await this.supplierModel
-  //           .findById(dto.publisherId)
-  //           .select({ _id: 1, isDeleted: 1 })
-  //           .session(session)
-  //           .lean();
+          const publisher = await this.supplierModel
+            .findById(dto.publisherId)
+            .select({ _id: 1, isDeleted: 1 })
+            .session(session)
+            .lean();
 
-  //         if (!publisher) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher not found' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+          if (!publisher) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher not found' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         if (publisher.isDeleted === true) {
-  //           throw new HttpException(
-  //             ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher is deleted' }]),
-  //             HttpStatus.BAD_REQUEST,
-  //           );
-  //         }
+          if (publisher.isDeleted === true) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publisherId', message: 'Publisher is deleted' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
 
-  //         book.publisherId = new Types.ObjectId(dto.publisherId);
-  //       }
+          book.publisherId = new Types.ObjectId(dto.publisherId);
+        }
 
-  //       // ===== 4) MEDIA =====
-  //       let currentImages = [...(book.images || [])];
-  //       const attachIds = new Set<string>();
-  //       const detachIds = new Set<string>();
+        // ===== 3.3) Validate and update authors if provided =====
+        if (dto.authors !== undefined) {
+          if (dto.authors.length > 0) {
+            const authorIds = dto.authors.map((id) => {
+              if (!Types.ObjectId.isValid(id)) {
+                throw new HttpException(
+                  ErrorResponse.validationError([{ field: 'authors', message: `Invalid authorId: ${id}` }]),
+                  HttpStatus.BAD_REQUEST,
+                );
+              }
+              return new Types.ObjectId(id);
+            });
 
-  //       // 4a) Remove images
-  //       if (dto.removeImages?.length) {
-  //         const removeIds = dto.removeImages.map((id) => {
-  //           if (!Types.ObjectId.isValid(id)) {
-  //             throw new HttpException(
-  //               ErrorResponse.validationError([{ field: 'removeImages', message: `Invalid mediaId: ${id}` }]),
-  //               HttpStatus.BAD_REQUEST,
-  //             );
-  //           }
-  //           return String(id);
-  //         });
+            const authors = await this.authorModel
+              .find({ _id: { $in: authorIds } })
+              .select({ _id: 1, status: 1, name: 1 })
+              .session(session)
+              .lean();
 
-  //         currentImages = currentImages.filter((imgId) => {
-  //           const shouldRemove = removeIds.includes(String(imgId));
-  //           if (shouldRemove) detachIds.add(String(imgId));
-  //           return !shouldRemove;
-  //         });
-  //       }
+            if (authors.length !== authorIds.length) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'authors', message: 'One or more authors not found' }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
 
-  //       // 4b) Add new images
-  //       if (dto.addImages?.length) {
-  //         const addIds = dto.addImages.map((id) => {
-  //           if (!Types.ObjectId.isValid(id)) {
-  //             throw new HttpException(
-  //               ErrorResponse.validationError([{ field: 'addImages', message: `Invalid mediaId: ${id}` }]),
-  //               HttpStatus.BAD_REQUEST,
-  //             );
-  //           }
-  //           return new Types.ObjectId(id);
-  //         });
+            const inactiveAuthor = authors.find((a) => a.status !== 'active');
+            if (inactiveAuthor) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'authors', message: 'One or more authors are not active' }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
 
-  //         const medias = await this.mediaModel
-  //           .find({ _id: { $in: addIds } })
-  //           .select({ _id: 1, url: 1, status: 1, uploadedBy: 1 })
-  //           .session(session);
+            book.authors = authorIds;
+          } else {
+            book.authors = [];
+          }
+        }
 
-  //         // if (medias.length !== addIds.length || medias.some((m) => m.status !== MediaStatus.TEMP)) {
-  //         //   throw new HttpException(
-  //         //     ErrorResponse.validationError([{ field: 'addImages', message: 'Invalid media' }]),
-  //         //     HttpStatus.BAD_REQUEST,
-  //         //   );
-  //         // }
+        // ===== 3.4) Update isbn if provided =====
+        if (dto.isbn !== undefined) {
+          book.isbn = dto.isbn?.trim() || undefined;
+        }
 
-  //         const existed = new Set(currentImages.map((i) => String(i)));
+        // ===== 4) MEDIA =====
+        let currentImages = [...(book.images || [])];
+        const attachIds = new Set<string>();
+        const detachIds = new Set<string>();
 
-  //         for (const m of medias) {
-  //           if (!existed.has(String(m._id))) {
-  //             currentImages.push(m._id);
-  //             attachIds.add(String(m._id));
-  //           }
-  //         }
-  //       }
+        // 4a) Remove images
+        if (dto.removeImages?.length) {
+          const removeIds = dto.removeImages.map((rid) => {
+            if (!Types.ObjectId.isValid(rid)) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'removeImages', message: `Invalid mediaId: ${rid}` }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+            return String(rid);
+          });
 
-  //       // 4c) Update thumbnailUrl if provided
-  //       if (dto.thumbnailUrl !== undefined) {
-  //         book.thumbnailUrl = dto.thumbnailUrl?.trim();
-  //       }
+          currentImages = currentImages.filter((imgId) => {
+            const shouldRemove = removeIds.includes(String(imgId));
+            if (shouldRemove) detachIds.add(String(imgId));
+            return !shouldRemove;
+          });
+        }
 
-  //       book.images = currentImages;
-  //       await book.save({ session });
-  //       updatedBook = book;
+        // 4b) Add new images
+        if (dto.addImages?.length) {
+          const addIds = dto.addImages.map((aid) => {
+            if (!Types.ObjectId.isValid(aid)) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'addImages', message: `Invalid mediaId: ${aid}` }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+            return new Types.ObjectId(aid);
+          });
 
-  //       // ===== 5) Update Media states =====
-  //       if (attachIds.size) {
-  //         await this.mediaModel.updateMany(
-  //           { _id: { $in: [...attachIds].map((id) => new Types.ObjectId(id)) }, status: 'TEMP' },
-  //           { $set: { status: 'ATTACHED' } },
-  //           { session },
-  //         );
-  //       }
+          const medias = await this.mediaModel
+            .find({ _id: { $in: addIds } })
+            .select({ _id: 1, url: 1, status: 1, uploadedBy: 1 })
+            .session(session);
 
-  //       if (detachIds.size) {
-  //         await this.mediaModel.updateMany(
-  //           { _id: { $in: [...detachIds].map((id) => new Types.ObjectId(id)) } },
-  //           { $set: { status: 'TEMP' } },
-  //           { session },
-  //         );
-  //       }
-  //     });
+          const existed = new Set(currentImages.map((i) => String(i)));
 
-  //     return new SuccessResponse(updatedBook, 'Book updated successfully');
-  //   } finally {
-  //     session.endSession();
-  //   }
-  // }
+          for (const m of medias) {
+            if (!existed.has(String(m._id))) {
+              currentImages.push(m._id);
+              attachIds.add(String(m._id));
+            }
+          }
+        }
+
+        // 4c) Update thumbnailUrl if provided
+        if (dto.thumbnailUrl !== undefined) {
+          book.thumbnailUrl = dto.thumbnailUrl?.trim();
+        }
+
+        book.images = currentImages;
+        await book.save({ session });
+        updatedBook = book;
+
+        // ===== 5) Update Media states =====
+        if (attachIds.size) {
+          await this.mediaModel.updateMany(
+            { _id: { $in: [...attachIds].map((mid) => new Types.ObjectId(mid)) }, status: 'TEMP' },
+            { $set: { status: 'ATTACHED' } },
+            { session },
+          );
+        }
+
+        if (detachIds.size) {
+          await this.mediaModel.updateMany(
+            { _id: { $in: [...detachIds].map((mid) => new Types.ObjectId(mid)) } },
+            { $set: { status: 'TEMP' } },
+            { session },
+          );
+        }
+
+        // ===== 6) Update Stock if provided =====
+        if (dto.stockQuantity !== undefined || dto.stockLocation !== undefined) {
+          const stockUpdate: Record<string, any> = { lastUpdated: new Date() };
+          if (dto.stockQuantity !== undefined) stockUpdate.quantity = dto.stockQuantity;
+          if (dto.stockLocation !== undefined) stockUpdate.location = dto.stockLocation;
+
+          await this.stockModel.findOneAndUpdate(
+            { bookId: book._id },
+            { $set: stockUpdate, $setOnInsert: { bookId: book._id } },
+            { upsert: true, session },
+          );
+        }
+      });
+
+      return new SuccessResponse(updatedBook, 'Book updated successfully');
+    } catch (error) {
+      this.logger.error(`Failed to update book: ${error.message}`, error.stack);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(ErrorResponse.badRequest('Failed to update book'), HttpStatus.INTERNAL_SERVER_ERROR);
+    } finally {
+      session.endSession();
+    }
+  }
 
   async deleteBook(id: string) {
     if (!Types.ObjectId.isValid(id)) {

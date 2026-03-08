@@ -102,4 +102,15 @@ export class UpdateBookDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   tags?: string[];
+
+  // ===== STOCK =====
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  stockQuantity?: number;
+
+  @IsOptional()
+  @IsString()
+  stockLocation?: string;
 }

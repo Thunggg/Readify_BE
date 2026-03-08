@@ -23,6 +23,8 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { BlogModule } from './modules/blog/blog.module';
+import { IncomeModule } from './modules/income/income.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     NotificationsModule,
     CategoriesModule,
     ReviewsModule,
+    BlogModule,
+    IncomeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

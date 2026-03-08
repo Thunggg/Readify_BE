@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Ip, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import type { Response } from 'express';
@@ -11,7 +11,10 @@ import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   private setOtpCookies(res: Response, email: string, purpose: OtpPurpose) {
     res.cookie('otpEmail', email, {
@@ -48,25 +51,30 @@ export class AuthController {
   // POST /auth/login
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
+    const response = await this.authService.login(dto, {
+      userAgent: req.headers['user-agent'],
+      ipAddress: ip,
+    });
 
     const { accessToken, refreshToken } = response.data;
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+    const refreshTokenTtl = this.configService.get<number>('jwt.refreshTokenExpiresIn') ?? 86400;
 
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 1200 * 60 * 1000, // 15 phút
+      maxAge: accessTokenTtl * 1000,
       path: '/',
-    }); 
+    });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+      sameSite: 'lax',
+      secure: false,
+      maxAge: refreshTokenTtl * 1000,
       path: '/',
     });
 
@@ -80,6 +88,7 @@ export class AuthController {
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     const response = await this.authService.logout(req?.cookies?.accessToken as string);
     res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
     return response;
   }
 
@@ -91,11 +100,13 @@ export class AuthController {
 
     const { accessToken } = response.data;
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 15 * 60 * 1000, // 15 phút
+      sameSite: 'lax',
+      secure: false,
+      maxAge: accessTokenTtl * 1000,
       path: '/',
     });
 
