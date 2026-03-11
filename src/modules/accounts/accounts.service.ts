@@ -367,7 +367,6 @@ export class AccountsService {
       const fields = ['firstName', 'lastName', 'email', 'phone'] as const;
 
       // AND giữa các keyword, OR giữa các field
-      // AND giữa các keyword và OR giữa các field
       filter.$and = keywords.map((keyword) => ({
         $or: fields.map((field) => ({
           [field]: { $regex: keyword, $options: 'i' },
@@ -629,10 +628,7 @@ export class AccountsService {
       throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
     }
 
-    const session = await this.refreshTokenModel
-      .findOne({ _id: sessionId, userId })
-      .select('token')
-      .lean();
+    const session = await this.refreshTokenModel.findOne({ _id: sessionId, userId }).select('token').lean();
 
     if (!session) {
       throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
