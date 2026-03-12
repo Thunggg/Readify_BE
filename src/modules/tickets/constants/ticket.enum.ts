@@ -2,7 +2,6 @@ export const TicketStatus = {
   OPEN: 'OPEN',
   WAITING_ADMIN: 'WAITING_ADMIN',
   WAITING_CUSTOMER: 'WAITING_CUSTOMER',
-  RESOLVED: 'RESOLVED',
   CLOSED: 'CLOSED',
 } as const;
 
@@ -18,7 +17,8 @@ export type TicketSenderRoleValue = (typeof TicketSenderRole)[keyof typeof Ticke
 export const TicketSortBy = {
   CREATED_AT: 'createdAt',
   LAST_MESSAGE_AT: 'lastMessageAt',
-  UPDATED_AT: 'updatedAt',
+  SUBJECT: 'subject',
+  EMAIL: 'email',
 } as const;
 
 export type TicketSortByValue = (typeof TicketSortBy)[keyof typeof TicketSortBy];
@@ -29,4 +29,3 @@ export const SortOrder = {
 } as const;
 
 export type SortOrderValue = (typeof SortOrder)[keyof typeof SortOrder];
-

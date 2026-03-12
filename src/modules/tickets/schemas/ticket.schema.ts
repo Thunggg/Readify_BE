@@ -47,9 +47,6 @@ export class Ticket {
   @Prop({ required: true, trim: true, maxlength: 200 })
   subject: string; // nội dung ticket
 
-  @Prop({ trim: true, maxlength: 100 })
-  category?: string; // danh mục ticket
-
   @Prop({ required: true, default: 'OPEN', index: true })
   status: TicketStatusValue; // trạng thái ticket
 
