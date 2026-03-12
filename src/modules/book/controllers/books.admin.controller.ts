@@ -30,6 +30,12 @@ export class BooksAdminController {
     return this.booksAdminService.addBook(dto);
   }
 
+
+  @Post(':id/publish')
+  publishBook(@Param() params: BookIdDto) {
+    return this.booksAdminService.publishBook(params.id);
+  }
+
   @Patch(':id')
   updateBook(@Param() params: BookIdDto, @Body() dto: UpdateBookDto) {
     return this.booksAdminService.updateBook(params.id, dto);

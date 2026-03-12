@@ -3,7 +3,7 @@ import { HydratedDocument } from 'mongoose';
 
 export type AccountDocument = HydratedDocument<Account>;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Account {
   // ========== BASIC INFO ==========
   @Prop({ trim: true })
@@ -30,9 +30,6 @@ export class Account {
 
   @Prop({ trim: true, select: false })
   password: string;
-
-  @Prop({ trim: true })
-  googleId?: string;
 
   @Prop()
   lastLoginAt?: Date;

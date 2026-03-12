@@ -1,7 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Model, PipelineStage, Types, type QueryFilter } from 'mongoose';
 import { Account, AccountDocument } from './schemas/account.schema';
-import { RegisterAccountDto } from './dto/register-account.dto';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ErrorResponse } from 'src/shared/responses/error.response';
@@ -13,6 +12,7 @@ import {
   AccountRole,
   AccountStatus,
   AccountStatusValue,
+  Pagination,
   SexValue,
   SortOrder,
   SortOrderValue,
@@ -43,63 +43,6 @@ export class AccountsService {
     private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
   ) {}
-
-  async register(dto: RegisterAccountDto) {
-    const email = dto.email.trim().toLowerCase();
-
-    const isEmailExists = await this.accountModel.exists({ email });
-    if (isEmailExists) {
-      throw new HttpException(
-        new ErrorResponse('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
-          { field: 'email', message: 'Email already exists' },
-        ]),
-        400,
-      );
-    }
-
-    if (dto.password !== dto.confirmPassword) {
-      throw new HttpException(
-        ErrorResponse.validationError([{ message: 'Password and confirm password do not match' }]),
-        400,
-      );
-    }
-
-    const passwordHash = await hashPassword(
-      dto.password,
-      this.configService.get<number>('bcrypt.saltRounds') as number,
-    );
-
-    const expiresInMinutes = Number(this.configService.get<number>('pendingRegistration.expiresInMinutes') ?? 15);
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000); // 15 phút
-
-    // Lưu pending registration (upsert) — CHƯA tạo Account
-    await this.pendingRegistrationModel.updateOne(
-      { email },
-      {
-        $set: {
-          email,
-          password: passwordHash,
-          firstName: dto.firstName.trim(),
-          lastName: dto.lastName.trim(),
-          phone: dto.phone.trim(),
-          address: dto.address.trim(),
-          dateOfBirth: new Date(dto.dateOfBirth),
-          sex: dto.sex,
-          expiresAt,
-        },
-      },
-      { upsert: true },
-    );
-
-    // Gửi OTP verify email (nếu đã gửi rồi thì fallback sang resend)
-    try {
-      await this.otpService.sendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
-    } catch (err: any) {
-      await this.otpService.reSendOtp({ email, purpose: OtpPurpose.VERIFY_EMAIL });
-    }
-
-    return new SuccessResponse(null, 'OTP sent successfully. Please verify to complete registration.', 200);
-  }
 
   async verifyRegister(regEmail: string, otp: string) {
     const email = (regEmail ?? '').trim().toLowerCase();
@@ -154,13 +97,20 @@ export class AccountsService {
   }
 
   async me(userId: string) {
-    const account = await this.accountModel.findById(userId).select({ password: 0 }).lean();
+    try {
+      const account = await this.accountModel.findById(userId).select({ password: 0 }).lean();
 
-    if (!account) {
-      throw new HttpException(new ErrorResponse('Account not found', 'ACCOUNT_NOT_FOUND', 404), 404);
+      if (!account) {
+        throw new HttpException(new ErrorResponse('Account not found', 'ACCOUNT_NOT_FOUND', 404), 404);
+      }
+
+      return new SuccessResponse(account, 'Account fetched successfully', 200);
+    } catch (error) {
+      throw new HttpException(
+        new ErrorResponse('Profile information not available.', 'PROFILE_NOT_AVAILABLE', 404),
+        404,
+      );
     }
-
-    return new SuccessResponse(account, 'Account fetched successfully', 200);
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
@@ -187,8 +137,8 @@ export class AccountsService {
       );
     }
 
-    if (dto.firstName !== undefined) account.firstName = dto.firstName.trim();
-    if (dto.lastName !== undefined) account.lastName = dto.lastName.trim();
+    if (dto.firstName !== undefined) account.firstName = dto.firstName.trim().replace(/\s+/g, ' ');
+    if (dto.lastName !== undefined) account.lastName = dto.lastName.trim().replace(/\s+/g, ' ');
     if (dto.dateOfBirth !== undefined) account.dateOfBirth = dto.dateOfBirth;
     if (dto.phone !== undefined) account.phone = dto.phone;
     if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
@@ -212,13 +162,20 @@ export class AccountsService {
 
     if (dto.newPassword !== dto.confirmPassword) {
       throw new HttpException(
-        ErrorResponse.badRequest('New password and confirm password do not match'),
+        ErrorResponse.validationError([
+          { field: 'newPassword', message: 'New password and confirm password do not match' },
+        ]),
         HttpStatus.BAD_REQUEST,
       );
     }
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new HttpException(ErrorResponse.badRequest('New password must be different'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        ErrorResponse.validationError([
+          { field: 'newPassword', message: 'New password must be different from current password' },
+        ]),
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const account = await this.accountModel.findById(userId).select('+password');
@@ -239,7 +196,10 @@ export class AccountsService {
 
     const ok = await comparePassword(dto.currentPassword, account.password);
     if (!ok) {
-      throw new HttpException(ErrorResponse.badRequest('Current password is incorrect'), HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'currentPassword', message: 'Current password is incorrect' }]),
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     account.password = await hashPassword(dto.newPassword, Number(this.configService.get<number>('bcrypt.saltRounds')));
@@ -249,10 +209,6 @@ export class AccountsService {
     await this.refreshTokenModel.deleteMany({ userId: saved._id });
 
     return new SuccessResponse(null, 'Password changed successfully', 200);
-  }
-
-  async uploadFile(file: Express.Multer.File) {
-    console.log(file);
   }
 
   async createAccount(dto: CreateAccountDto) {
@@ -377,47 +333,43 @@ export class AccountsService {
     return new SuccessResponse(account, 'Get account detail successfully', 200);
   }
 
-  private buildAccountFileter(param: {
+  private buildAccountFileter(params: {
     q?: string;
     status?: AccountStatusValue[];
     isDeleted?: boolean;
     sex?: SexValue[];
-  }) {
-    const { q, status, isDeleted, sex } = param;
+  }): QueryFilter<AccountDocument> {
+    const { q, status, isDeleted, sex } = params;
 
     const filter: QueryFilter<AccountDocument> = {
       role: {
         $in: [AccountRole.USER],
-        $ne: AccountRole.ADMIN,
       },
+
+      // Mặc định không lấy account đã xoá mềm.
+      // Nếu isDeleted=true thì chỉ lấy account đã xoá.
+      isDeleted: isDeleted === true ? true : { $ne: true },
     };
 
-    // Xử lý trạng thái isDeleted
-    if (isDeleted === true) {
-      filter.isDeleted = true;
-    } else {
-      filter.isDeleted = { $ne: true };
-    }
-
-    // Filter theo status (array)
-    if (status !== undefined && Array.isArray(status) && status.length > 0) {
+    // Filter theo status (nếu có)
+    if (Array.isArray(status) && status.length > 0) {
       filter.status = { $in: status };
     }
 
-    // Filter theo sex (array)
-    if (sex !== undefined && Array.isArray(sex) && sex.length > 0) {
+    // Filter theo sex (nếu có)
+    if (Array.isArray(sex) && sex.length > 0) {
       filter.sex = { $in: sex };
     }
 
-    //Filter theo từ khóa tìm kiếm
-    if (q) {
-      // value	Boolean(value) => true nếu value không phải là falsey (false, 0, null, undefined, NaN, "")
-      const searchKeywords = q.trim().split(/\s+/).filter(Boolean).slice(0, 5); // Tách chuỗi thành các từ khóa riêng lẻ, tối đa 5 từ
-      const searchFields = ['firstName', 'lastName', 'email', 'phone'] as const;
+    // Filter theo từ khoá tìm kiếm (q): ["nguyen", "", "", "van", "", "a"]
+    if (q && q.trim().length > 0) {
+      const keywords = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
+      const fields = ['firstName', 'lastName', 'email', 'phone'] as const;
 
-      filter.$and = searchKeywords.map((kw) => ({
-        $or: searchFields.map((f) => ({
-          [f]: { $regex: kw, $options: 'i' },
+      // AND giữa các keyword, OR giữa các field
+      filter.$and = keywords.map((keyword) => ({
+        $or: fields.map((field) => ({
+          [field]: { $regex: keyword, $options: 'i' },
         })),
       }));
     }
@@ -426,20 +378,33 @@ export class AccountsService {
   }
 
   private buildSortStage(sortBy: string, order: SortOrderValue): PipelineStage {
-    const sortOrder = order === SortOrder.ASC ? 1 : -1;
+    const direction: 1 | -1 = order === SortOrder.ASC ? 1 : -1;
 
-    // Map các trường sort với hướng sort tương ứng
-    const sortMap: Record<string, Record<string, 1 | -1>> = {
-      [StaffSortBy.CREATED_AT]: { createdAt: sortOrder },
-      [StaffSortBy.EMAIL]: { email: sortOrder },
-      [StaffSortBy.LAST_LOGIN_AT]: { lastLoginAt: sortOrder },
-      [StaffSortBy.DATE_OF_BIRTH]: { dateOfBirth: sortOrder },
-      [StaffSortBy.FULL_NAME]: { fullName: sortOrder },
-    };
+    let sortStage: Record<string, 1 | -1>;
 
-    // Lấy sort stage từ map, mặc định sort theo CREATED_AT
-    const sortStage = sortMap[sortBy] || { createdAt: -1 };
+    switch (sortBy) {
+      case StaffSortBy.CREATED_AT:
+        sortStage = { createdAt: 1 };
+        break;
+      case StaffSortBy.EMAIL:
+        sortStage = { email: direction };
+        break;
+      case StaffSortBy.LAST_LOGIN_AT:
+        sortStage = { lastLoginAt: direction };
+        break;
+      case StaffSortBy.DATE_OF_BIRTH:
+        sortStage = { dateOfBirth: direction };
+        break;
+      case StaffSortBy.FULL_NAME:
+        sortStage = { fullName: direction };
+        break;
+      default:
+        // Nếu sortBy không hợp lệ thì fallback về createdAt
+        sortStage = { createdAt: -1 };
+        break;
+    }
 
+    // Luôn thêm _id để ổn định thứ tự khi dữ liệu bị trùng key sort
     return { $sort: { ...sortStage, _id: 1 } };
   }
 
@@ -451,9 +416,10 @@ export class AccountsService {
     limit: number;
   }): PipelineStage[] {
     const { filter, sortBy, order, skip, limit } = params;
+
     const pipeline: PipelineStage[] = [{ $match: filter }];
 
-    // Thêm fullName field ảo nếu cần sort theo fullName
+    // Nếu sort theo fullName thì cần tạo field fullName (ảo) để sort
     if (sortBy === StaffSortBy.FULL_NAME) {
       pipeline.push({
         $addFields: {
@@ -464,12 +430,7 @@ export class AccountsService {
       });
     }
 
-    // xây dựng sort stage
-    const sortStage = this.buildSortStage(sortBy, order);
-    pipeline.push(sortStage);
-
-    // Thêm pagination
-    pipeline.push({ $skip: skip }, { $limit: limit });
+    pipeline.push(this.buildSortStage(sortBy, order), { $skip: skip }, { $limit: limit });
 
     return pipeline;
   }
@@ -482,30 +443,30 @@ export class AccountsService {
       isDeleted,
       sortBy = StaffSortBy.CREATED_AT,
       order = SortOrder.DESC,
-      page = 1,
-      limit = 10,
+      page = Pagination.DEFAULT_PAGE,
+      limit = Pagination.DEFAULT_LIMIT,
     } = query;
 
     // PAGINATION
-    const validPage = Math.max(1, page);
-    const validLimit = Math.min(50, Math.max(1, limit));
-    const skip = (validPage - 1) * validLimit;
+    const pageNumber = Math.max(Pagination.MIN_PAGE, page);
+    const pageSize = Math.min(Pagination.MAX_LIMIT, Math.max(Pagination.MIN_LIMIT, limit));
+    const skip = (pageNumber - 1) * pageSize;
 
     // FILTER
     const filter = this.buildAccountFileter({ q, status, isDeleted, sex });
 
     // SORT
-    const aggregationPipeline = this.buildAggregationPipeline({ filter, sortBy, order, skip, limit: validLimit });
+    const pipeline = this.buildAggregationPipeline({ filter, sortBy, order, skip, limit: pageSize });
 
     // QUERY
     const [items, total] = await Promise.all([
-      this.accountModel.aggregate(aggregationPipeline),
+      this.accountModel.aggregate(pipeline),
       this.accountModel.countDocuments(filter),
     ]);
 
     return new PaginatedResponse(
       items,
-      { page: validPage, limit: validLimit, total },
+      { page: pageNumber, limit: pageSize, total },
       'Account list retrieved successfully',
     );
   }
@@ -533,7 +494,7 @@ export class AccountsService {
       await this.otpService.sendOtp({ email, purpose: OtpPurpose.FORGOT_PASSWORD });
     } catch (err) {
       // Nếu OTP đã được gửi (hoặc bất kỳ lỗi OTP nào khác), giữ nguyên phản hồi không tiết lộ
-      return new SuccessResponse(null, 'If the email exists, an OTP has been sent', 200);
+      return new SuccessResponse(null, 'Unable to send reset OTP email. Please try again later.', 200);
     }
 
     return new SuccessResponse(null, 'If the email exists, an OTP has been sent', 200);
@@ -644,5 +605,52 @@ export class AccountsService {
 
     const { password, ...accountData } = account.toObject();
     return new SuccessResponse(accountData, 'Password reset successfully', 200);
+  }
+
+  async getSessions(userId: string, currentToken?: string) {
+    const sessions = await this.refreshTokenModel
+      .find({ userId })
+      .sort({ lastUsedAt: -1 })
+      .select('_id userAgent ipAddress lastUsedAt createdAt token');
+
+    return sessions.map((session) => ({
+      id: session._id,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      lastUsedAt: session.lastUsedAt,
+      createdAt: session.createdAt,
+      isCurrent: session.token === currentToken,
+    }));
+  }
+
+  async revokeSession(sessionId: string[], userId: string, currentToken?: string) {
+    if (!sessionId.every((id) => Types.ObjectId.isValid(id))) {
+      throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
+    }
+
+    const session = await this.refreshTokenModel
+      .findOne({ _id: { $in: sessionId }, userId })
+      .select('token')
+      .lean();
+
+    if (!session) {
+      throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
+    }
+
+    const isCurrent = Boolean(currentToken) && session.token === currentToken;
+
+    await this.refreshTokenModel.deleteOne({ _id: sessionId, userId });
+
+    return isCurrent;
+  }
+
+  async revokeAllSessions(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new HttpException(ErrorResponse.badRequest('Invalid account id'), HttpStatus.BAD_REQUEST);
+    }
+
+    const result = await this.refreshTokenModel.deleteMany({ userId });
+
+    return { revokedCount: result.deletedCount ?? 0 };
   }
 }

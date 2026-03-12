@@ -1,9 +1,12 @@
-import { IsInt, IsIn } from 'class-validator';
+import { IsInt, IsIn, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { AccountStaffRole } from '../constants/staff.enum';
+import type { AccountStaffRoleValue } from '../constants/staff.enum';
 
 export class UpdateStaffRoleDto {
-  @Type(() => Number)
   @IsInt()
-  @IsIn([1, 2, 3]) // 1 admin, 2 seller, 3 warehouse
-  role: number;
+  @IsEnum(AccountStaffRole, {
+    message: 'Role must be one of: 1 (ADMIN), 2 (SELLER), 3 (WAREHOUSE)',
+  })
+  role: AccountStaffRoleValue;
 }

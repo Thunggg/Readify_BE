@@ -14,11 +14,9 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import type { Response } from 'express';
-import { RegisterAccountDto } from './dto/register-account.dto';
+import type { Request, Response } from 'express';
 import { AccountsService } from './accounts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { AccountIdDto } from './dto/account-id.dto';
 import { UpdateAccountDto } from './dto/edit-account.dto';
@@ -32,12 +30,16 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { BadRequestException } from '@nestjs/common';
+import { JwtUtil } from 'src/shared/utils/jwt';
+import { LogoutSessionDto } from './dto/logout-session.dto';
 
 @Controller('accounts')
+@UseGuards(JwtAuthGuard)
 export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
     private readonly otpService: OtpService,
+    private readonly jwtUtil: JwtUtil,
   ) {}
 
   private setOtpCookies(res: Response, email: string, purpose: 'VERIFY_EMAIL' | 'FORGOT_PASSWORD') {
@@ -66,16 +68,6 @@ export class AccountsController {
     if (raw === 'VERIFY_EMAIL') return OtpPurpose.VERIFY_EMAIL;
     if (raw === 'FORGOT_PASSWORD') return OtpPurpose.FORGOT_PASSWORD;
     throw new BadRequestException('Invalid otpPurpose cookie');
-  }
-
-  @Post('register')
-  async register(@Body() dto: RegisterAccountDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.accountsService.register(dto);
-
-    const email = dto.email.trim().toLowerCase();
-    this.setOtpCookies(res, email, OtpPurpose.VERIFY_EMAIL);
-
-    return response;
   }
 
   @Post('otp/resend')
@@ -137,10 +129,40 @@ export class AccountsController {
     return this.accountsService.changePassword(req?.user?.userId as string, dto);
   }
 
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return this.accountsService.uploadFile(file);
+  @Get('sessions')
+  async getSessions(@Req() req: any) {
+    const userId = req?.user?.userId as string;
+    const currentToken = String(req?.cookies?.refreshToken ?? '');
+
+    return this.accountsService.getSessions(userId, currentToken);
+  }
+
+  @Delete('sessions/logout')
+  async logoutSession(@Req() req: any, @Res({ passthrough: true }) res: Response, @Body() dto: LogoutSessionDto) {
+    const userId = req?.user?.userId as string;
+    const currentToken = String(req?.cookies?.refreshToken ?? '');
+
+    const isCurrent = await this.accountsService.revokeSession(dto.sessionIds, userId, currentToken);
+
+    if (isCurrent) {
+      res.clearCookie('accessToken', { path: '/' });
+      res.clearCookie('refreshToken', { path: '/' });
+    }
+
+    return new SuccessResponse(null, 'Session revoked', 200);
+  }
+
+  @Delete('sessions')
+  async revokeAllSessions(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const userId = req?.user?.userId as string;
+
+    const result = await this.accountsService.revokeAllSessions(userId);
+
+    // revoke all => logout luôn thiết bị hiện tại
+    res.clearCookie('accessToken', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/' });
+
+    return new SuccessResponse(result, 'All sessions revoked', 200);
   }
 
   @Get(':id')
@@ -182,7 +204,6 @@ export class AccountsController {
   async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: any, @Res({ passthrough: true }) res: Response) {
     const token = req?.cookies?.resetPasswordToken as string;
     const response = await this.accountsService.resetPassword(token, dto);
-
     res.clearCookie('resetPasswordToken', { path: '/' });
     this.clearOtpCookies(res);
 

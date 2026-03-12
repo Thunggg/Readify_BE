@@ -77,20 +77,20 @@ export class UpdateBookDto {
 
   // ===== IMAGE ACTIONS =====
   @IsOptional()
-  @IsMongoId()
-  coverMediaId?: string;
-
-  @IsOptional()
   @IsArray()
   @ArrayMaxSize(10)
   @IsMongoId({ each: true })
-  addGalleryMediaIds?: string[];
+  addImages?: string[];
 
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
   @IsMongoId({ each: true })
-  removeMediaIds?: string[];
+  removeImages?: string[];
+
+  @IsOptional()
+  @IsString()
+  thumbnailUrl?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -102,4 +102,15 @@ export class UpdateBookDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   tags?: string[];
+
+  // ===== STOCK =====
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  stockQuantity?: number;
+
+  @IsOptional()
+  @IsString()
+  stockLocation?: string;
 }

@@ -123,6 +123,8 @@ export class SupplierService {
       })
       .lean();
 
+      // 1 là để lấy field đó, 0 là để bỏ field đó
+
     if (!supplier) {
       throw new HttpException(ErrorResponse.notFound('Supplier not found'), HttpStatus.NOT_FOUND);
     }

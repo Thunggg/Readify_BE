@@ -38,6 +38,7 @@
     "cloudinary": "^2.8.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
+    "escape-string-regexp": "^5.0.0",
     "joi": "^18.0.2",
     "mongodb": "^5.8.0",
     "mongoose": "^9.0.2",

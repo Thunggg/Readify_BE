@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { SearchPublicBooksDto } from '../dto/search-public-books.dto';
 import { SearchBookSuggestionsDto } from '../dto/search-book-suggestions.dto';
 import { BooksPublicService } from '../services/books.public.service';

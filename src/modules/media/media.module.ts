@@ -7,9 +7,14 @@ import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { Media, MediaSchema } from './schemas/media.schema';
 import { MediaCleanupJob } from './media.cleanup.job';
+import { Account, AccountSchema } from '../accounts/schemas/account.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Media.name, schema: MediaSchema }]), ScheduleModule.forRoot()],
+  imports: [
+    MongooseModule.forFeature([{ name: Media.name, schema: MediaSchema }]),
+    MongooseModule.forFeature([{ name: Account.name, schema: AccountSchema }]),
+    ScheduleModule.forRoot(),
+  ],
   controllers: [MediaController],
   providers: [cloudinaryProvider, CloudinaryService, MediaService, MediaCleanupJob],
   exports: [MediaService],
