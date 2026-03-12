@@ -2,6 +2,7 @@ import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { SortOrder, TicketSortBy, TicketStatus } from '../constants/ticket.enum';
 
 import type { TicketStatusValue, TicketSortByValue, SortOrderValue } from '../constants/ticket.enum';
+import { Transform } from 'class-transformer';
 
 export class GetTicketsQueryDto {
   @IsOptional()
@@ -10,6 +11,14 @@ export class GetTicketsQueryDto {
 
   @IsOptional()
   @IsEnum(TicketStatus, { each: true })
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value as string[];
+    }
+    if (typeof value === 'string') return [value];
+
+    return [];
+  })
   statusFilter?: TicketStatusValue[];
 
   @IsOptional()

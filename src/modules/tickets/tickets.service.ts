@@ -255,4 +255,82 @@ export class TicketsService {
 
     return new SuccessResponse(ticket, 'Ticket replied successfully');
   }
+
+  async getCustomerTickets(customerId: string, query: GetTicketsQueryDto) {
+    if (!Types.ObjectId.isValid(customerId)) {
+      throw new BadRequestException('Invalid customer id');
+    }
+
+    const { search, statusFilter, sortBy, order, page, limit } = query;
+
+    const currentPage = Math.max(Number(page) || 1, 1);
+    const pageSize = Math.max(Number(limit) || 10, 1);
+    const skip = (currentPage - 1) * pageSize;
+
+    const pipeline: PipelineStage[] = [];
+
+    // Filter by status
+    pipeline.push({
+      $match: {
+        customerId: new Types.ObjectId(customerId),
+      },
+    });
+
+    if (Array.isArray(statusFilter) && statusFilter.length > 0) {
+      pipeline.push({ $match: { status: { $in: statusFilter } } });
+    }
+
+    // search by ticketID, subject
+    const normalizedSearch = typeof search === 'string' ? search.trim() : '';
+    if (normalizedSearch) {
+      const rx = new RegExp(escapeStringRegexp(normalizedSearch), 'i');
+
+      const or: any[] = [{ subject: { $regex: rx } }];
+
+      if (Types.ObjectId.isValid(normalizedSearch)) {
+        or.push({ _id: new Types.ObjectId(normalizedSearch) });
+      }
+
+      pipeline.push({ $match: { $or: or } });
+    }
+
+    // sort by createdAt DESC
+    const sortField = (sortBy ?? TicketSortBy.CREATED_AT) as TicketSortByValue;
+    const sortDirection: 1 | -1 = order === SortOrder.ASC ? 1 : -1;
+
+    pipeline.push({
+      $sort: {
+        [sortField]: sortDirection,
+      },
+    });
+
+    // pagination
+    pipeline.push({
+      $facet: {
+        items: [{ $skip: skip }, { $limit: pageSize }],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    type TicketListItem = Record<string, unknown>;
+
+    const aggregated = await this.ticketModel
+      .aggregate<{
+        items: TicketListItem[];
+        total: { count: number }[];
+      }>(pipeline)
+      .exec();
+    const items: TicketListItem[] = aggregated?.[0]?.items ?? [];
+    const total: number = aggregated?.[0]?.total[0]?.count ?? 0;
+
+    return new PaginatedResponse(
+      items,
+      {
+        page: currentPage,
+        limit: pageSize,
+        total,
+      },
+      'Tickets fetched successfully',
+    );
+  }
 }

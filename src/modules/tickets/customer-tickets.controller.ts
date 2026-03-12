@@ -6,6 +6,7 @@ import { AccountRole } from '../staff/constants/staff.enum';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket-customer';
 import { ReplyTicketDto } from './dto/reply-ticket';
+import { GetTicketsQueryDto } from './dto/get-ticket-query';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.USER)
@@ -29,5 +30,11 @@ export class TicketsController {
   @Post(':id/reply')
   replyTicket(@Param('id') id: string, @Body() dto: ReplyTicketDto, @Req() req: any) {
     return this.ticketsService.customerReplyTicket(id, dto, req.user.userId as string);
+  }
+
+  // Customer view all their ticket
+  @Get()
+  getCustomerTickets(@Req() req: any, @Query() query: GetTicketsQueryDto) {
+    return this.ticketsService.getCustomerTickets(req.user.userId as string, query);
   }
 }
