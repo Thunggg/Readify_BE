@@ -7,6 +7,7 @@ import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket-customer';
 import { ReplyTicketDto } from './dto/reply-ticket';
 import { GetTicketsQueryDto } from './dto/get-ticket-query';
+import { RatingTicketDto } from './dto/rating-ticket';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.USER)
@@ -36,5 +37,11 @@ export class TicketsController {
   @Get()
   getCustomerTickets(@Req() req: any, @Query() query: GetTicketsQueryDto) {
     return this.ticketsService.getCustomerTickets(req.user.userId as string, query);
+  }
+
+  // Customer rating ticket
+  @Patch(':id/rating')
+  ratingTicket(@Param('id') id: string, @Body() dto: RatingTicketDto, @Req() req: any) {
+    return this.ticketsService.ratingTicket(id, dto, req.user.userId as string);
   }
 }

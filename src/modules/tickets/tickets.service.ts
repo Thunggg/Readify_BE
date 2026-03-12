@@ -20,6 +20,7 @@ import { CreateTicketDto } from './dto/create-ticket-customer';
 import { ReplyTicketDto } from './dto/reply-ticket';
 import { GetTicketsQueryDto } from './dto/get-ticket-query';
 import escapeStringRegexp from 'escape-string-regexp';
+import { RatingTicketDto } from './dto/rating-ticket';
 
 @Injectable()
 export class TicketsService {
@@ -332,5 +333,47 @@ export class TicketsService {
       },
       'Tickets fetched successfully',
     );
+  }
+
+  async ratingTicket(id: string, dto: RatingTicketDto, customerId: string) {
+    try {
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException('Invalid ticket id');
+      }
+
+      const ticket = await this.ticketModel.findById(id);
+
+      // Nếu ticket không tồn tại
+      if (!ticket) {
+        throw new NotFoundException('Ticket not found');
+      }
+
+      // Nếu ticket không thuộc về customer
+      if (ticket.customerId.toString() !== customerId) {
+        throw new ForbiddenException('You are not allowed to rate this ticket');
+      }
+
+      // Nếu ticket chưa đóng thì không thể đánh giá
+      if (ticket.status !== TicketStatus.CLOSED) {
+        throw new BadRequestException('Ticket is not closed');
+      }
+
+      // Nếu ticket đã được đánh giá và đã đóng thì không thể đánh giá lại
+      if (ticket.csat) {
+        throw new BadRequestException('Ticket already rated');
+      }
+
+      ticket.csat = {
+        rating: Number(dto.rating),
+        comment: dto.comment?.trim() ?? '',
+        submittedAt: new Date(),
+      };
+
+      await ticket.save();
+
+      return new SuccessResponse(ticket, 'Ticket rated successfully');
+    } catch (error) {
+      throw new BadRequestException('Failed to rate ticket');
+    }
   }
 }
