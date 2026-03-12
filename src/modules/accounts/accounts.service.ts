@@ -623,12 +623,15 @@ export class AccountsService {
     }));
   }
 
-  async revokeSession(sessionId: string, userId: string, currentToken?: string) {
-    if (!Types.ObjectId.isValid(sessionId)) {
+  async revokeSession(sessionId: string[], userId: string, currentToken?: string) {
+    if (!sessionId.every((id) => Types.ObjectId.isValid(id))) {
       throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
     }
 
-    const session = await this.refreshTokenModel.findOne({ _id: sessionId, userId }).select('token').lean();
+    const session = await this.refreshTokenModel
+      .findOne({ _id: { $in: sessionId }, userId })
+      .select('token')
+      .lean();
 
     if (!session) {
       throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
