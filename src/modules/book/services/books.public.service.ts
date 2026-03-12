@@ -8,6 +8,7 @@ import { SortOrder } from 'mongoose';
 import { SearchBookSuggestionsDto } from '../dto/search-book-suggestions.dto';
 import { PaginatedResponse } from '../../../shared/responses/paginated.response';
 import { SuccessResponse } from '../../../shared/responses/success.response';
+import { empty } from 'rxjs';
 
 // Service cung cấp các API công khai cho sách (không yêu cầu xác thực)
 @Injectable()
@@ -51,7 +52,7 @@ export class BooksPublicService {
 
     // Tìm kiếm theo từ khóa trong title, slug, hoặc isbn (không phân biệt hoa thường)
     // ===== search =====
-    const keyword = query.q?.trim(); // Lấy từ khóa từ query.q và loại bỏ khoảng trắng đầu/cuối
+    const keyword = query.q?.trim() || ''; // Lấy từ khóa từ query.q và loại bỏ khoảng trắng đầu/cuối
     if (keyword) { // Chỉ tìm kiếm nếu từ khóa không rỗng
       filter.$or = [ // Sử dụng $or để tìm kiếm trong ít nhất một trường
         { title: { $regex: keyword, $options: 'i' } }, // Tìm trong title với regex không phân biệt hoa thường

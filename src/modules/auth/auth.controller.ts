@@ -11,7 +11,42 @@ import { SuccessResponse } from 'src/shared/responses/success.response';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private setOtpCookies(res: Response, email: string, purpose: OtpPurpose) {
+    res.cookie('otpEmail', email, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: 15 * 60 * 1000,
+      path: '/',
+    });
+    res.cookie('otpPurpose', purpose, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: 15 * 60 * 1000,
+      path: '/',
+    });
+  }
+
+  // POST /auth/register
+  @HttpCode(HttpStatus.OK)
+  @Post('register')
+  async register(
+    @Body() dto: RegisterAccountDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SuccessResponse<null>> {
+    const response: SuccessResponse<null> = await this.authService.register(dto);
+
+    const email = dto.email.trim().toLowerCase();
+    this.setOtpCookies(res, email, OtpPurpose.VERIFY_EMAIL);
+
+    return response;
+  }
 
   private setOtpCookies(res: Response, email: string, purpose: OtpPurpose) {
     res.cookie('otpEmail', email, {
@@ -60,15 +95,15 @@ export class AuthController {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 1200 * 60 * 1000, // 15 phút
+      maxAge: 10 * 1000, // 10 giây
       path: '/',
     });
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+      sameSite: 'lax',
+      secure: false,
+      maxAge: refreshTokenTtl * 1000,
       path: '/',
     });
 
@@ -94,11 +129,13 @@ export class AuthController {
 
     const { accessToken } = response.data;
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      sameSite: 'lax', // dev OK
-      secure: false, // true khi HTTPS
-      maxAge: 15 * 60 * 1000, // 15 phút
+      sameSite: 'lax',
+      secure: false,
+      maxAge: accessTokenTtl * 1000,
       path: '/',
     });
 
