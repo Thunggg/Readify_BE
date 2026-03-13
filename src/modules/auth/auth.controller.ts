@@ -48,38 +48,6 @@ export class AuthController {
     return response;
   }
 
-  private setOtpCookies(res: Response, email: string, purpose: OtpPurpose) {
-    res.cookie('otpEmail', email, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: 15 * 60 * 1000,
-      path: '/',
-    });
-    res.cookie('otpPurpose', purpose, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: 15 * 60 * 1000,
-      path: '/',
-    });
-  }
-
-  // POST /auth/register
-  @HttpCode(HttpStatus.OK)
-  @Post('register')
-  async register(
-    @Body() dto: RegisterAccountDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<SuccessResponse<null>> {
-    const response: SuccessResponse<null> = await this.authService.register(dto);
-
-    const email = dto.email.trim().toLowerCase();
-    this.setOtpCookies(res, email, OtpPurpose.VERIFY_EMAIL);
-
-    return response;
-  }
-
   // POST /auth/login
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -91,11 +59,14 @@ export class AuthController {
 
     const { accessToken, refreshToken } = response.data;
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+    const refreshTokenTtl = this.configService.get<number>('jwt.refreshTokenExpiresIn') ?? 86400;
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 10 * 1000, // 10 giây
+      maxAge: accessTokenTtl * 1000,
       path: '/',
     });
 
