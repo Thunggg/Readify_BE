@@ -1,8 +1,13 @@
 import {
+  Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  Patch,
   Post,
+  Query,
+  ParseIntPipe,
   UploadedFile,
   UseInterceptors,
   Res,
@@ -13,6 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { StockService } from './stock.service';
 import { StockIdDto } from './dto/stock-id.dto';
+import { UpdateStockDto } from './dto/update-stock.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
@@ -30,9 +36,22 @@ export class StockController {
     return this.stockService.getStockList();
   }
 
+  @Get('alerts')
+  getStockAlerts(
+    @Query('lowStockThreshold', new DefaultValuePipe(5), ParseIntPipe)
+    lowStockThreshold: number,
+  ) {
+    return this.stockService.getStockAlerts(lowStockThreshold);
+  }
+
   @Get(':id')
   getStockDetail(@Param() params: StockIdDto) {
     return this.stockService.getStockDetail(params.id);
+  }
+
+  @Patch(':id')
+  updateStock(@Param() params: StockIdDto, @Body() dto: UpdateStockDto) {
+    return this.stockService.updateStock(params.id, dto);
   }
 
   @Post('import')

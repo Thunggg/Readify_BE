@@ -7,6 +7,7 @@ import { validate } from 'class-validator';
 
 import { Stock, StockDocument } from './schemas/stock.schema';
 import { ImportStockRowDto, ImportStockResultDto } from './dto/import-stock.dto';
+import { UpdateStockDto } from './dto/update-stock.dto';
 import { ErrorResponse } from '../../shared/responses/error.response';
 import { SuccessResponse } from '../../shared/responses/success.response';
 
@@ -37,6 +38,59 @@ export class StockService {
     }
   }
 
+  async getStockAlerts(lowStockThreshold = 5) {
+    const threshold = Math.max(1, lowStockThreshold);
+
+    try {
+      const stocks = await this.stockModel
+        .find({ quantity: { $lte: threshold } })
+        .populate('bookId')
+        .sort({ quantity: 1, lastUpdated: 1 })
+        .lean()
+        .exec();
+
+      const items = stocks.map((stock: any) => {
+        const quantity = Number(stock.quantity ?? 0);
+        const book = stock.bookId && typeof stock.bookId === 'object' ? stock.bookId : null;
+        const level = quantity <= 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK';
+
+        return {
+          stockId: String(stock._id),
+          quantity,
+          location: stock.location || '',
+          status: stock.status || 'available',
+          level,
+          book: {
+            id: book?._id ? String(book._id) : '',
+            title: book?.title || 'Unknown book',
+            isbn: book?.isbn || '',
+          },
+          lastUpdated: stock.lastUpdated || null,
+        };
+      });
+
+      const outOfStockCount = items.filter((item) => item.level === 'OUT_OF_STOCK').length;
+      const lowStockCount = items.filter((item) => item.level === 'LOW_STOCK').length;
+
+      return new SuccessResponse(
+        {
+          threshold,
+          total: items.length,
+          outOfStockCount,
+          lowStockCount,
+          items,
+        },
+        'Successfully fetched stock alerts',
+      );
+    } catch (err) {
+      this.logger.error('Error fetching stock alerts: ' + String(err));
+      throw new HttpException(
+        new ErrorResponse('Failed to fetch stock alerts', 'INTERNAL_ERROR', 500),
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   async getStockDetail(id: string) {
     // Kiểm tra id có đúng format ObjectId của MongoDB không
     if (!Types.ObjectId.isValid(id)) {
@@ -59,6 +113,53 @@ export class StockService {
       this.logger.error('Error fetching stock detail: ' + String(err));
       throw new HttpException(
         new ErrorResponse('Failed to fetch stock detail', 'INTERNAL_ERROR', 500),
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async updateStock(id: string, dto: UpdateStockDto) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid stock id');
+    }
+
+    const hasUpdatableField =
+      dto.quantity !== undefined ||
+      dto.location !== undefined ||
+      dto.price !== undefined ||
+      dto.batch !== undefined ||
+      dto.status !== undefined;
+
+    if (!hasUpdatableField) {
+      throw new BadRequestException(
+        ErrorResponse.badRequest('At least one field is required to update stock item'),
+      );
+    }
+
+    try {
+      const stock = await this.stockModel.findById(id).exec();
+
+      if (!stock) {
+        throw new HttpException(ErrorResponse.notFound('Stock not found'), HttpStatus.NOT_FOUND);
+      }
+
+      if (dto.quantity !== undefined) stock.quantity = dto.quantity;
+      if (dto.location !== undefined) stock.location = dto.location;
+      if (dto.price !== undefined) stock.price = dto.price;
+      if (dto.batch !== undefined) stock.batch = dto.batch;
+      if (dto.status !== undefined) stock.status = dto.status;
+
+      stock.lastUpdated = new Date();
+
+      await stock.save();
+      await stock.populate('bookId');
+
+      return new SuccessResponse(stock, 'Successfully updated stock item');
+    } catch (err) {
+      if (err instanceof HttpException || err instanceof BadRequestException) throw err;
+      this.logger.error('Error updating stock item: ' + String(err));
+      throw new HttpException(
+        new ErrorResponse('Failed to update stock item', 'INTERNAL_ERROR', 500),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
