@@ -5,6 +5,7 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 import { ListReviewsDto } from './dto/list-reviews.dto';
 import { ReviewIdDto } from './dto/review-id.dto';
 import { BookIdDto } from './dto/book-id.dto';
+import { AdminReplyDto } from './dto/admin-reply.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
@@ -31,6 +32,34 @@ export class ReviewsController {
   @Roles(AccountRole.ADMIN)
   getAdminReviewsList(@Query() query: ListReviewsDto, @Req() req: any) {
     return this.reviewsService.getReviewsList(query, req?.user?.userId, req?.user?.role);
+  }
+
+  @Get('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  getAdminReviewDetail(@Param() params: ReviewIdDto, @Req() req: any) {
+    return this.reviewsService.getReviewDetail(params.id, req?.user?.userId, req?.user?.role);
+  }
+
+  @Patch('admin/:id/reply')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  adminReplyReview(@Param() params: ReviewIdDto, @Body() dto: AdminReplyDto, @Req() req: any) {
+    return this.reviewsService.adminReplyReview(params.id, dto, req?.user?.userId);
+  }
+
+  @Patch('admin/:id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  updateReviewStatus(@Param() params: ReviewIdDto, @Body() dto: UpdateReviewDto, @Req() req: any) {
+    return this.reviewsService.updateReview(params.id, dto, req?.user?.userId, req?.user?.role);
+  }
+
+  @Delete('admin/:id/reply')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
+  deleteAdminReply(@Param() params: ReviewIdDto, @Req() req: any) {
+    return this.reviewsService.deleteAdminReply(params.id, req?.user?.userId);
   }
 
   @Get('book/:bookId')

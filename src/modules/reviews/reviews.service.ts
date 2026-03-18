@@ -6,6 +6,7 @@ import { Book, BookDocument } from '../book/schemas/book.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ListReviewsDto, ReviewSortBy, SortOrder } from './dto/list-reviews.dto';
+import { AdminReplyDto } from './dto/admin-reply.dto';
 import { ErrorResponse } from 'src/shared/responses/error.response';
 import { AccountRole } from '../staff/constants/staff.enum';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
@@ -174,6 +175,7 @@ export class ReviewsService {
         .limit(validLimit)
         .populate('userId', 'email firstName lastName')
         .populate('bookId', 'title slug thumbnailUrl')
+        .populate('adminReplyBy', 'email firstName lastName')
         .select({
           _id: 1,
           userId: 1,
@@ -183,6 +185,9 @@ export class ReviewsService {
           comment: 1,
           status: 1,
           helpfulCount: 1,
+          adminReply: 1,
+          adminReplyAt: 1,
+          adminReplyBy: 1,
           createdAt: 1,
           updatedAt: 1,
         })
@@ -226,6 +231,7 @@ export class ReviewsService {
       .findOne(baseFilter)
       .populate('userId', 'email firstName lastName')
       .populate('bookId', 'title slug thumbnailUrl')
+      .populate('adminReplyBy', 'email firstName lastName')
       .select({
         _id: 1,
         userId: 1,
@@ -235,6 +241,9 @@ export class ReviewsService {
         comment: 1,
         status: 1,
         helpfulCount: 1,
+        adminReply: 1,
+        adminReplyAt: 1,
+        adminReplyBy: 1,
         createdAt: 1,
         updatedAt: 1,
       })
@@ -512,6 +521,87 @@ export class ReviewsService {
       'Đánh dấu đánh giá hữu ích thành công',
       200,
     );
+  }
+
+  async adminReplyReview(reviewId: string, dto: AdminReplyDto, adminUserId: string) {
+    if (!Types.ObjectId.isValid(reviewId)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid review ID' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isActive: true,
+    });
+
+    if (!review) {
+      throw new HttpException(ErrorResponse.notFound('Review not found'), HttpStatus.NOT_FOUND);
+    }
+
+    // Update admin reply
+    review.adminReply = dto.adminReply.trim();
+    review.adminReplyAt = new Date();
+    review.adminReplyBy = new Types.ObjectId(adminUserId);
+    await review.save();
+
+    const reviewData = await this.reviewModel
+      .findById(review._id)
+      .populate('userId', 'email firstName lastName')
+      .populate('bookId', 'title slug thumbnailUrl')
+      .populate('adminReplyBy', 'email firstName lastName')
+      .select({
+        _id: 1,
+        userId: 1,
+        bookId: 1,
+        orderId: 1,
+        rating: 1,
+        comment: 1,
+        status: 1,
+        helpfulCount: 1,
+        adminReply: 1,
+        adminReplyAt: 1,
+        adminReplyBy: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .lean();
+
+    return new SuccessResponse(reviewData, 'Phản hồi đánh giá thành công', 200);
+  }
+
+  async deleteAdminReply(reviewId: string, adminUserId: string) {
+    if (!Types.ObjectId.isValid(reviewId)) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'id', message: 'Invalid review ID' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isActive: true,
+    });
+
+    if (!review) {
+      throw new HttpException(ErrorResponse.notFound('Review not found'), HttpStatus.NOT_FOUND);
+    }
+
+    if (!review.adminReply) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'adminReply', message: 'No admin reply to delete' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Remove admin reply
+    review.adminReply = undefined;
+    review.adminReplyAt = undefined;
+    review.adminReplyBy = undefined;
+    await review.save();
+
+    return new SuccessResponse({ _id: reviewId }, 'Xóa phản hồi thành công', 200);
   }
 
   // Private helper methods

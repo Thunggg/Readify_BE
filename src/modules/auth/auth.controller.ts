@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Ip, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import type { Response } from 'express';
@@ -51,20 +51,22 @@ export class AuthController {
   // POST /auth/login
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
+    const response = await this.authService.login(dto, {
+      userAgent: req.headers['user-agent'],
+      ipAddress: ip,
+    });
 
     const { accessToken, refreshToken } = response.data;
 
-
     const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
-    const refreshTokenTtl = this.configService.get<number>('jwt.refreshTokenExpiresIn') ?? 604800;
+    const refreshTokenTtl = this.configService.get<number>('jwt.refreshTokenExpiresIn') ?? 86400;
 
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 10 * 1000, // 10 giây
+      maxAge: accessTokenTtl * 1000,
       path: '/',
     });
 

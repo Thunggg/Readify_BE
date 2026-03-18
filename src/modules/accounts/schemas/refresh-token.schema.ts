@@ -17,6 +17,15 @@ export class RefreshToken {
 
   @Prop({ required: true })
   updatedAt: Date;
+
+  @Prop()
+  userAgent?: string;
+
+  @Prop()
+  ipAddress?: string;
+
+  @Prop()
+  lastUsedAt?: Date;
 }
 
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);
