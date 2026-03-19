@@ -152,19 +152,6 @@ export class AccountsController {
     return new SuccessResponse(null, 'Session revoked', 200);
   }
 
-  @Delete('sessions')
-  async revokeAllSessions(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const userId = req?.user?.userId as string;
-
-    const result = await this.accountsService.revokeAllSessions(userId);
-
-    // revoke all => logout luôn thiết bị hiện tại
-    res.clearCookie('accessToken', { path: '/' });
-    res.clearCookie('refreshToken', { path: '/' });
-
-    return new SuccessResponse(result, 'All sessions revoked', 200);
-  }
-
   @Get(':id')
   getAccountDetail(@Param() params: AccountIdDto) {
     return this.accountsService.getAccountDetail(params.id);

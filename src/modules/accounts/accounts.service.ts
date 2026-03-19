@@ -628,18 +628,19 @@ export class AccountsService {
       throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
     }
 
-    const session = await this.refreshTokenModel
-      .findOne({ _id: { $in: sessionId }, userId })
-      .select('token')
-      .lean();
+    const isCurrent = currentToken
+      ? (await this.refreshTokenModel.exists({
+          _id: { $in: sessionId },
+          userId,
+          token: currentToken,
+        })) !== null
+      : false;
 
-    if (!session) {
+    const deleted = await this.refreshTokenModel.deleteMany({ _id: { $in: sessionId }, userId });
+
+    if (!deleted.deletedCount) {
       throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
     }
-
-    const isCurrent = Boolean(currentToken) && session.token === currentToken;
-
-    await this.refreshTokenModel.deleteOne({ _id: sessionId, userId });
 
     return isCurrent;
   }
