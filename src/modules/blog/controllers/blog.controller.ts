@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -20,51 +21,73 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 export class BlogController {
   constructor(private readonly blogService: BlogService) {}
 
+  private resolveUserIdFromRequest(req: any): string {
+    const userId = req?.user?.userId ?? req?.user?._id ?? req?.user?.id ?? req?.user?.sub;
+
+    if (!userId) {
+      throw new BadRequestException('Cannot resolve user id from token');
+    }
+
+    return String(userId);
+  }
+
   // ─── PUBLIC ────────────────────────────────────────
 
   @Get('posts')
-  async findAll(@Query() query: BlogQueryDto) {
-    return this.blogService.findAll(query);
+  async getPublicPosts(@Query() query: BlogQueryDto) {
+    return this.blogService.getPublicPosts(query);
   }
 
   @Get('categories')
-  async getCategories() {
-    return this.blogService.getCategories();
+  async getPublicCategories() {
+    return this.blogService.getPublicCategories();
   }
 
   @Get('posts/:slug')
-  async findBySlug(@Param('slug') slug: string) {
-    return this.blogService.findBySlug(slug);
+  async getPublicPostDetailBySlug(@Param('slug') slug: string) {
+    return this.blogService.getPublicPostDetailBySlug(slug);
   }
 
   @Get('posts/:id/related')
-  async getRelatedPosts(
+  async getPublicRelatedPosts(
     @Param('id') id: string,
     @Query('limit') limit?: number,
   ) {
-    return this.blogService.getRelatedPosts(id, limit ? Number(limit) : 4);
+    return this.blogService.getPublicRelatedPosts(id, limit ? Number(limit) : 4);
   }
 
-  // ─── AUTHENTICATED ─────────────────────────────────
+  // ─── ADMIN / AUTHENTICATED ─────────────────────────
+
+  @Get('admin/posts')
+  @UseGuards(JwtAuthGuard)
+  async getAdminPosts(@Query() query: BlogQueryDto) {
+    return this.blogService.getAdminPosts(query);
+  }
+
+  @Get('admin/posts/:id')
+  @UseGuards(JwtAuthGuard)
+  async getAdminPostDetail(@Param('id') id: string) {
+    return this.blogService.getAdminPostDetail(id);
+  }
 
   @Post('posts')
   @UseGuards(JwtAuthGuard)
-  async create(@Body() createBlogPostDto: CreateBlogPostDto, @Request() req: any) {
-    return this.blogService.create(createBlogPostDto, String(req.user._id));
+  async createAdminPost(@Body() createBlogPostDto: CreateBlogPostDto, @Request() req: any) {
+    return this.blogService.createAdminPost(createBlogPostDto, this.resolveUserIdFromRequest(req));
   }
 
   @Put('posts/:slug')
   @UseGuards(JwtAuthGuard)
-  async update(
+  async updateAdminPost(
     @Param('slug') slug: string,
     @Body() updateBlogPostDto: UpdateBlogPostDto,
   ) {
-    return this.blogService.update(slug, updateBlogPostDto);
+    return this.blogService.updateAdminPost(slug, updateBlogPostDto);
   }
 
   @Delete('posts/:slug')
   @UseGuards(JwtAuthGuard)
-  async delete(@Param('slug') slug: string) {
-    return this.blogService.delete(slug);
+  async deleteAdminPost(@Param('slug') slug: string) {
+    return this.blogService.deleteAdminPost(slug);
   }
 }

@@ -1,4 +1,6 @@
-import { IsString, IsOptional, IsMongoId, IsArray, IsIn, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsIn, IsMongoId, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsUniqueArray } from '../../../shared/decorators';
 
 export class CreateBlogPostDto {
   @IsString()
@@ -27,6 +29,14 @@ export class CreateBlogPostDto {
 
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @Transform(({ value }) =>
+    Array.isArray(value)
+      ? value.map((tag) => (typeof tag === 'string' ? tag.trim() : tag))
+      : value,
+  )
+  @IsUniqueArray({ message: 'tags must not contain duplicate values' })
   tags?: string[];
 
   @IsString()
