@@ -284,6 +284,7 @@ export class TicketsService {
     // search by ticketID, subject
     const normalizedSearch = typeof search === 'string' ? search.trim() : '';
     if (normalizedSearch) {
+      // loại bỏ các ký tự đặc biệt trong regex để tránh lỗi.
       const rx = new RegExp(escapeStringRegexp(normalizedSearch), 'i');
 
       const or: any[] = [{ subject: { $regex: rx } }];
@@ -333,6 +334,10 @@ export class TicketsService {
       },
       'Tickets fetched successfully',
     );
+
+    // Nếu bạn viết /hello?*/ → JS sẽ hiểu:
+    // ? là "0 hoặc 1 lần"
+    // * là "0 hoặc nhiều lần"
   }
 
   async ratingTicket(id: string, dto: RatingTicketDto, customerId: string) {
