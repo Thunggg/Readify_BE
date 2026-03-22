@@ -32,9 +32,12 @@ import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { BadRequestException } from '@nestjs/common';
 import { JwtUtil } from 'src/shared/utils/jwt';
 import { LogoutSessionDto } from './dto/logout-session.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('accounts')
 @UseGuards(JwtAuthGuard)
+@ApiTags('Accounts')
+@ApiBearerAuth()
 export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,

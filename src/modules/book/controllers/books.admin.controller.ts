@@ -5,7 +5,9 @@ import { BookIdDto } from '../dto/book-id.dto';
 import { BookSlugDto } from '../dto/book-slug.dto';
 import { CreateBookDto } from '../dto/create-book.dto';
 import { UpdateBookDto } from '../dto/update-book.dto';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Books (Admin)')
 @Controller('admin/book')
 export class BooksAdminController {
   constructor(private readonly booksAdminService: BooksAdminService) {}

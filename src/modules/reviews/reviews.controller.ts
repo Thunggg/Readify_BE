@@ -10,8 +10,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { AccountRole } from '../staff/constants/staff.enum';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('reviews')
+@ApiTags('Reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 

@@ -11,9 +11,12 @@ import { RolesGuard } from '../../shared/guards/roles.guard';
 import { AccountRole } from '../staff/constants/staff.enum';
 import { JwtUtil } from '../../shared/utils/jwt';
 import { ConfigService } from '@nestjs/config';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
+@ApiTags('Notifications')
+@ApiBearerAuth()
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,

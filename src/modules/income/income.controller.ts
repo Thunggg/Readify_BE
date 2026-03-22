@@ -11,10 +11,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { AccountRole } from '../staff/constants/staff.enum';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('income')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.ADMIN, AccountRole.SELLER)
+@ApiTags('Income')
+@ApiBearerAuth()
 export class IncomeController {
   constructor(private readonly incomeService: IncomeService) {}
 

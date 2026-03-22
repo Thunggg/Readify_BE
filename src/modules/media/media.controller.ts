@@ -4,9 +4,12 @@ import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadMediaDto } from './dto/upload-media.dto';
 import { Types } from 'mongoose';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
+@ApiTags('Media')
+@ApiBearerAuth()
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 
