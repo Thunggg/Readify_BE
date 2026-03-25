@@ -15,6 +15,9 @@ import { Supplier } from 'src/modules/supplier/schemas/supplier.schema';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
 import { SuccessResponse } from 'src/shared/responses/success.response';
 import { BookCurrency, BookLanguage, BookStatus } from '../enums/book.enum';
+import { Order, OrderDocument } from 'src/modules/order/schemas/order.schema';
+import { Review, ReviewDocument } from 'src/modules/reviews/schemas/review.schema';
+import { TrendingRecommendationsDto } from '../dto/trending-recommendations.dto';
 
 @Injectable()
 export class BooksAdminService {
@@ -28,7 +31,290 @@ export class BooksAdminService {
     @InjectModel(Media.name) private readonly mediaModel: Model<Media>,
     @InjectModel(Category.name) private readonly categoryModel: Model<Category>,
     @InjectModel(Supplier.name) private readonly supplierModel: Model<Supplier>,
+    @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
+    @InjectModel(Review.name) private readonly reviewModel: Model<ReviewDocument>,
   ) {}
+
+  private normalizeByMax(value: number, maxValue: number): number {
+    if (maxValue <= 0) return 0;
+    return Math.min(1, Math.max(0, value / maxValue));
+  }
+
+  private calcRecencyScore(dateValue?: Date | string | null): number {
+    if (!dateValue) return 0;
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return 0;
+
+    const days = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24);
+    if (days <= 30) return 1;
+    if (days <= 90) return 0.8;
+    if (days <= 180) return 0.6;
+    if (days <= 365) return 0.4;
+    return 0.2;
+  }
+
+  private async fetchExternalTrendSignal(book: { title?: string; isbn?: string; publishDate?: Date }): Promise<{
+    source: 'google-books';
+    avgRating: number;
+    ratingsCount: number;
+    recencyScore: number;
+    score: number;
+  } | null> {
+    try {
+      const query = book.isbn?.trim()
+        ? `isbn:${book.isbn.trim()}`
+        : book.title?.trim()
+          ? `intitle:${book.title.trim()}`
+          : '';
+
+      if (!query) return null;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2500);
+
+      const response = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`,
+        { signal: controller.signal },
+      );
+      clearTimeout(timer);
+
+      if (!response.ok) return null;
+
+      const json = (await response.json()) as any;
+      const volumeInfo = json?.items?.[0]?.volumeInfo;
+      if (!volumeInfo) return null;
+
+      const avgRating = Number(volumeInfo.averageRating ?? 0);
+      const ratingsCount = Number(volumeInfo.ratingsCount ?? 0);
+      const recencyScore = this.calcRecencyScore(volumeInfo.publishedDate || book.publishDate || null);
+
+      const ratingScore = Math.min(1, Math.max(0, avgRating / 5));
+      const ratingsCountScore = Math.min(1, ratingsCount / 1000);
+      const score = ratingScore * 0.5 + ratingsCountScore * 0.3 + recencyScore * 0.2;
+
+      return {
+        source: 'google-books',
+        avgRating,
+        ratingsCount,
+        recencyScore,
+        score,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async getTrendingRecommendations(query: TrendingRecommendationsDto) {
+    const limit = Math.min(Math.max(query.limit ?? 8, 1), 20);
+    const includeWebData = query.includeWebData ?? true;
+    const lookbackDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    const baseBooks = await this.bookModel
+      .find({
+        isDeleted: { $ne: true },
+        status: { $in: [BookStatus.ACTIVE, BookStatus.OUT_OF_STOCK] },
+      })
+      .select({
+        title: 1,
+        slug: 1,
+        thumbnailUrl: 1,
+        soldCount: 1,
+        publishDate: 1,
+        createdAt: 1,
+        isbn: 1,
+      })
+      .sort({ soldCount: -1, createdAt: -1 })
+      .limit(120)
+      .lean();
+
+    if (baseBooks.length === 0) {
+      return new SuccessResponse(
+        {
+          generatedAt: new Date().toISOString(),
+          sourceSummary: {
+            internal: true,
+            web: false,
+          },
+          items: [],
+        },
+        'No books available for recommendations',
+      );
+    }
+
+    const bookIds = baseBooks.map((book) => book._id);
+
+    const [ordersAgg, reviewsAgg] = await Promise.all([
+      this.orderModel
+        .aggregate([
+          {
+            $match: {
+              status: { $in: ['DELIVERED', 'COMPLETED'] },
+              createdAt: { $gte: lookbackDate },
+            },
+          },
+          { $unwind: '$items' },
+          { $match: { 'items.bookId': { $in: bookIds } } },
+          {
+            $group: {
+              _id: '$items.bookId',
+              recentPurchasedQty: { $sum: '$items.quantity' },
+            },
+          },
+        ])
+        .exec(),
+      this.reviewModel
+        .aggregate([
+          {
+            $match: {
+              bookId: { $in: bookIds },
+              isActive: true,
+              status: 'APPROVED',
+            },
+          },
+          {
+            $group: {
+              _id: '$bookId',
+              fiveStarCount: {
+                $sum: {
+                  $cond: [{ $eq: ['$rating', 5] }, 1, 0],
+                },
+              },
+              avgRating: { $avg: '$rating' },
+              totalReviews: { $sum: 1 },
+            },
+          },
+        ])
+        .exec(),
+    ]);
+
+    const orderMap = new Map<string, number>();
+    for (const item of ordersAgg) {
+      orderMap.set(String(item._id), Number(item.recentPurchasedQty ?? 0));
+    }
+
+    const reviewMap = new Map<string, { fiveStarCount: number; avgRating: number; totalReviews: number }>();
+    for (const item of reviewsAgg) {
+      reviewMap.set(String(item._id), {
+        fiveStarCount: Number(item.fiveStarCount ?? 0),
+        avgRating: Number(item.avgRating ?? 0),
+        totalReviews: Number(item.totalReviews ?? 0),
+      });
+    }
+
+    const candidates = baseBooks.map((book) => {
+      const review = reviewMap.get(String(book._id)) || {
+        fiveStarCount: 0,
+        avgRating: 0,
+        totalReviews: 0,
+      };
+
+      return {
+        ...book,
+        internal: {
+          soldCount: Number(book.soldCount ?? 0),
+          recentPurchasedQty: Number(orderMap.get(String(book._id)) ?? 0),
+          fiveStarCount: review.fiveStarCount,
+          avgRating: review.avgRating,
+          totalReviews: review.totalReviews,
+          recencyScore: this.calcRecencyScore(book.publishDate || null),
+        },
+      };
+    });
+
+    const maxPurchase = Math.max(
+      ...candidates.map((book) => book.internal.soldCount + book.internal.recentPurchasedQty),
+      1,
+    );
+    const maxFiveStar = Math.max(...candidates.map((book) => book.internal.fiveStarCount), 1);
+
+    const withScores = candidates.map((book) => {
+      const purchaseSignal = book.internal.soldCount + book.internal.recentPurchasedQty;
+      const purchaseScore = this.normalizeByMax(purchaseSignal, maxPurchase);
+      const fiveStarScore = this.normalizeByMax(book.internal.fiveStarCount, maxFiveStar);
+      const ratingQualityScore = Math.min(1, Math.max(0, book.internal.avgRating / 5));
+
+      const internalScore =
+        purchaseScore * 0.45 + fiveStarScore * 0.25 + ratingQualityScore * 0.2 + book.internal.recencyScore * 0.1;
+
+      return {
+        ...book,
+        purchaseSignal,
+        internalScore,
+      };
+    });
+
+    withScores.sort((a, b) => b.internalScore - a.internalScore);
+
+    const enrichedTarget = withScores.slice(0, Math.min(20, Math.max(limit * 2, limit)));
+
+    const externalSignals = includeWebData
+      ? await Promise.all(
+          enrichedTarget.map(async (book) => ({
+            bookId: String(book._id),
+            signal: await this.fetchExternalTrendSignal({
+              title: book.title,
+              isbn: book.isbn,
+              publishDate: book.publishDate,
+            }),
+          })),
+        )
+      : [];
+
+    const externalMap = new Map<string, Awaited<ReturnType<typeof this.fetchExternalTrendSignal>>>();
+    for (const row of externalSignals) {
+      externalMap.set(row.bookId, row.signal ?? null);
+    }
+
+    const final = withScores
+      .map((book) => {
+        const external = externalMap.get(String(book._id)) || null;
+        const finalScore = book.internalScore * 0.85 + (external?.score ?? 0) * 0.15;
+
+        return {
+          _id: String(book._id),
+          title: book.title,
+          slug: book.slug,
+          isbn: book.isbn || '',
+          thumbnailUrl: book.thumbnailUrl || '',
+          soldCount: book.internal.soldCount,
+          recentPurchasedQty: book.internal.recentPurchasedQty,
+          fiveStarCount: book.internal.fiveStarCount,
+          avgRating: Number(book.internal.avgRating.toFixed(2)),
+          totalReviews: book.internal.totalReviews,
+          publishDate: book.publishDate || null,
+          internalScore: Number(book.internalScore.toFixed(4)),
+          externalScore: Number((external?.score ?? 0).toFixed(4)),
+          score: Number(finalScore.toFixed(4)),
+          trendReasons: [
+            book.purchaseSignal > 0 ? `Purchased ${book.purchaseSignal} times (sold + recent orders)` : null,
+            book.internal.fiveStarCount > 0 ? `${book.internal.fiveStarCount} five-star reviews` : null,
+            book.internal.recencyScore >= 0.8 ? 'Recently published' : null,
+            external ? `Web signal: rating ${external.avgRating}/5 (${external.ratingsCount} ratings)` : null,
+          ].filter(Boolean),
+          externalWeb: external
+            ? {
+                source: external.source,
+                avgRating: external.avgRating,
+                ratingsCount: external.ratingsCount,
+              }
+            : null,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return new SuccessResponse(
+      {
+        generatedAt: new Date().toISOString(),
+        sourceSummary: {
+          internal: true,
+          web: includeWebData,
+        },
+        items: final,
+      },
+      'Successfully generated trending book recommendations',
+    );
+  }
 
   private generateSlug(text: string): string {
     if (!text) return '';
@@ -531,7 +817,7 @@ export class BooksAdminService {
           soldCount: 0,
           publishedAt: undefined,
         } satisfies Partial<Book>;
-        
+
         const book = await new this.bookModel(bookPayload).save({ session });
         createdBook = book;
 
@@ -981,8 +1267,6 @@ export class BooksAdminService {
     }
   }
 
-
-
   // Publish existing draft book
   async publishBook(id: string) {
     if (!Types.ObjectId.isValid(id)) {
@@ -999,7 +1283,7 @@ export class BooksAdminService {
 
       await session.withTransaction(async () => {
         const book = await this.bookModel.findById(id).session(session);
-        
+
         if (!book) {
           throw new HttpException(ErrorResponse.notFound('Book not found'), HttpStatus.NOT_FOUND);
         }
@@ -1030,7 +1314,7 @@ export class BooksAdminService {
         // Update book status to ACTIVE
         book.status = BookStatus.ACTIVE;
         book.publishedAt = new Date();
-        
+
         await book.save({ session });
         publishedBook = book;
       });
@@ -1043,10 +1327,7 @@ export class BooksAdminService {
         throw error;
       }
 
-      throw new HttpException(
-        ErrorResponse.badRequest('Failed to publish book'),
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException(ErrorResponse.badRequest('Failed to publish book'), HttpStatus.INTERNAL_SERVER_ERROR);
     } finally {
       session.endSession();
     }
