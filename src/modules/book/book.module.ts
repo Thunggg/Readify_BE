@@ -12,6 +12,8 @@ import { Media, MediaSchema } from '../media/schemas/media.schema';
 import { Category, CategorySchema } from '../categories/schemas/category.schema';
 import { Supplier, SupplierSchema } from '../supplier/schemas/supplier.schema';
 import { Author, AuthorSchema } from './schemas/author.schema';
+import { Order, OrderSchema } from '../order/schemas/order.schema';
+import { Review, ReviewSchema } from '../reviews/schemas/review.schema';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { Author, AuthorSchema } from './schemas/author.schema';
       { name: Media.name, schema: MediaSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Supplier.name, schema: SupplierSchema },
+      { name: Order.name, schema: OrderSchema },
+      { name: Review.name, schema: ReviewSchema },
     ]),
   ],
   controllers: [BooksAdminController, BooksPublicController, AuthorsAdminController],

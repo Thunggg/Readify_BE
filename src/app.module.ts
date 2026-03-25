@@ -26,6 +26,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { BlogModule } from './modules/blog/blog.module';
 import { IncomeModule } from './modules/income/income.module';
+import { CollectionsModule } from './modules/collections/collections.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { IncomeModule } from './modules/income/income.module';
     TicketsModule,
     BlogModule,
     IncomeModule,
+    CollectionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

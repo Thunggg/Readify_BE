@@ -48,16 +48,3 @@ export class RecentOrdersDto {
   limit?: number = 10;
 }
 
-export class ExportIncomeDto {
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-
-  @IsOptional()
-  @IsEnum(GroupBy)
-  groupBy?: GroupBy = GroupBy.DAY;
-}
