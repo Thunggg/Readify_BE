@@ -8,8 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import { RegisterAccountDto } from './dto/register-account.dto';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('auth')
+@ApiTags('Auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -84,6 +86,7 @@ export class AuthController {
   // POST /auth/logout
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post('logout')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     const response = await this.authService.logout(req?.cookies?.accessToken as string);

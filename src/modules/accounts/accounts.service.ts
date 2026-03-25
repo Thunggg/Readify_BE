@@ -367,7 +367,6 @@ export class AccountsService {
       const fields = ['firstName', 'lastName', 'email', 'phone'] as const;
 
       // AND giữa các keyword, OR giữa các field
-      // AND giữa các keyword và OR giữa các field
       filter.$and = keywords.map((keyword) => ({
         $or: fields.map((field) => ({
           [field]: { $regex: keyword, $options: 'i' },
@@ -624,23 +623,24 @@ export class AccountsService {
     }));
   }
 
-  async revokeSession(sessionId: string, userId: string, currentToken?: string) {
-    if (!Types.ObjectId.isValid(sessionId)) {
+  async revokeSession(sessionId: string[], userId: string, currentToken?: string) {
+    if (!sessionId.every((id) => Types.ObjectId.isValid(id))) {
       throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
     }
 
-    const session = await this.refreshTokenModel
-      .findOne({ _id: sessionId, userId })
-      .select('token')
-      .lean();
+    const isCurrent = currentToken
+      ? (await this.refreshTokenModel.exists({
+          _id: { $in: sessionId },
+          userId,
+          token: currentToken,
+        })) !== null
+      : false;
 
-    if (!session) {
+    const deleted = await this.refreshTokenModel.deleteMany({ _id: { $in: sessionId }, userId });
+
+    if (!deleted.deletedCount) {
       throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
     }
-
-    const isCurrent = Boolean(currentToken) && session.token === currentToken;
-
-    await this.refreshTokenModel.deleteOne({ _id: sessionId, userId });
 
     return isCurrent;
   }

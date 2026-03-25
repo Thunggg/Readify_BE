@@ -4,9 +4,12 @@ import { PromotionLogService } from './promotion-log.service';
 import { SearchPromotionLogDto } from './dto/search-promotion-log.dto';
 import { PromotionLogIdDto } from './dto/promotion-log-id.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('promotion-logs')
 @UseGuards(JwtAuthGuard)
+@ApiTags('Promotion Logs')
+@ApiBearerAuth()
 export class PromotionLogController {
   constructor(private readonly promotionLogService: PromotionLogService) {}
 

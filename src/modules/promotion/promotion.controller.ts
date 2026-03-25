@@ -7,9 +7,12 @@ import { UpdatePromotionDto } from './dto/update-promotion.dto';
 import { ApplyPromotionDto } from './dto/apply-promotion.dto';
 import { PromotionIdDto } from './dto/promotion-id.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('promotions')
 @UseGuards(JwtAuthGuard)
+@ApiTags('Promotions')
+@ApiBearerAuth()
 export class PromotionController {
   constructor(private readonly promotionService: PromotionService) {}
 

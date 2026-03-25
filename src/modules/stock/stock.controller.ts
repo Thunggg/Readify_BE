@@ -24,10 +24,13 @@ import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SuccessResponse } from '../../shared/responses/success.response';
 import { ErrorResponse } from '../../shared/responses/error.response';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('stocks')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(1, 3) // Admin = 1, Warehouse Staff = 3
+@ApiTags('Stock')
+@ApiBearerAuth()
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

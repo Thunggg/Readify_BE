@@ -12,10 +12,13 @@ type AuthenticatedRequest = {
     userId: string;
   };
 };
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('income')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.ADMIN, AccountRole.SELLER)
+@ApiTags('Income')
+@ApiBearerAuth()
 export class IncomeController {
   constructor(private readonly incomeService: IncomeService) {}
 

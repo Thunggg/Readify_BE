@@ -31,9 +31,13 @@ import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { BadRequestException } from '@nestjs/common';
 import { JwtUtil } from 'src/shared/utils/jwt';
+import { LogoutSessionDto } from './dto/logout-session.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('accounts')
 @UseGuards(JwtAuthGuard)
+@ApiTags('Accounts')
+@ApiBearerAuth()
 export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
@@ -136,12 +140,12 @@ export class AccountsController {
     return this.accountsService.getSessions(userId, currentToken);
   }
 
-  @Delete('sessions/:id')
-  async revokeSession(@Param('id') id: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+  @Delete('sessions/logout')
+  async logoutSession(@Req() req: any, @Res({ passthrough: true }) res: Response, @Body() dto: LogoutSessionDto) {
     const userId = req?.user?.userId as string;
     const currentToken = String(req?.cookies?.refreshToken ?? '');
 
-    const isCurrent = await this.accountsService.revokeSession(id, userId, currentToken);
+    const isCurrent = await this.accountsService.revokeSession(dto.sessionIds, userId, currentToken);
 
     if (isCurrent) {
       res.clearCookie('accessToken', { path: '/' });
@@ -149,19 +153,6 @@ export class AccountsController {
     }
 
     return new SuccessResponse(null, 'Session revoked', 200);
-  }
-
-  @Delete('sessions')
-  async revokeAllSessions(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const userId = req?.user?.userId as string;
-
-    const result = await this.accountsService.revokeAllSessions(userId);
-
-    // revoke all => logout luôn thiết bị hiện tại
-    res.clearCookie('accessToken', { path: '/' });
-    res.clearCookie('refreshToken', { path: '/' });
-
-    return new SuccessResponse(result, 'All sessions revoked', 200);
   }
 
   @Get(':id')
