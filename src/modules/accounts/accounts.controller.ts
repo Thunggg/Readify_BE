@@ -35,9 +35,7 @@ import { LogoutSessionDto } from './dto/logout-session.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('accounts')
-@UseGuards(JwtAuthGuard)
 @ApiTags('Accounts')
-@ApiBearerAuth()
 export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
@@ -116,23 +114,28 @@ export class AccountsController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   getMe(@Req() req: any) {
     return this.accountsService.me(req?.user?.userId as string);
   }
 
   @Patch('me')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   updateMe(@Req() req: any, @Body() dto: UpdateProfileDto) {
     return this.accountsService.updateProfile(req?.user?.userId as string, dto);
   }
 
   @Patch('me/change-password')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   changePassword(@Req() req: any, @Body() dto: ChangePasswordDto): Promise<SuccessResponse<null>> {
     return this.accountsService.changePassword(req?.user?.userId as string, dto);
   }
 
   @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   async getSessions(@Req() req: any) {
     const userId = req?.user?.userId as string;
     const currentToken = String(req?.cookies?.refreshToken ?? '');
@@ -141,6 +144,8 @@ export class AccountsController {
   }
 
   @Delete('sessions/logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   async logoutSession(@Req() req: any, @Res({ passthrough: true }) res: Response, @Body() dto: LogoutSessionDto) {
     const userId = req?.user?.userId as string;
     const currentToken = String(req?.cookies?.refreshToken ?? '');
@@ -156,26 +161,36 @@ export class AccountsController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   getAccountDetail(@Param() params: AccountIdDto) {
     return this.accountsService.getAccountDetail(params.id);
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   getAccountList(@Query() query: SearchAccountDto) {
     return this.accountsService.getAccountList(query);
   }
 
   @Post('create')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   create(@Body() dto: CreateAccountDto) {
     return this.accountsService.createAccount(dto);
   }
 
   @Put('edit/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   editAccount(@Param() params: AccountIdDto, @Body() dto: UpdateAccountDto) {
     return this.accountsService.editAccount(params.id, dto);
   }
 
   @Delete('delete/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   deleteAccount(@Param() params: AccountIdDto) {
     return this.accountsService.deleteAccount(params.id);
   }

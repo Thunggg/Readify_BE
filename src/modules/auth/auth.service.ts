@@ -13,6 +13,7 @@ import { RegisterAccountDto } from './dto/register-account.dto';
 import { PendingRegistration, PendingRegistrationDocument } from '../accounts/schemas/pendingRegistration.schema';
 import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
+import { AccountStatus } from '../staff/constants/staff.enum';
 
 @Injectable()
 export class AuthService {
@@ -26,7 +27,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
     private readonly jwtUtil: JwtUtil,
-  ) { }
+  ) {}
 
   async register(dto: RegisterAccountDto) {
     const email = dto.email.trim().toLowerCase();
@@ -118,8 +119,12 @@ export class AuthService {
     }
 
     // 3) check email is verified or not
-    if (account.status === 2) {
+    if (account.status === AccountStatus.NOT_ACTIVE_EMAIL) {
       throw new HttpException(new ErrorResponse('Email is not verified', 'EMAIL_NOT_VERIFIED', 400), 400);
+    }
+
+    if (account.status === AccountStatus.BANNED) {
+      throw new HttpException(new ErrorResponse('Account is banned', 'ACCOUNT_BANNED', 400), 400);
     }
 
     // 4) generate access token and refresh token
