@@ -24,6 +24,10 @@ export class Category {
   @Prop({ default: 0, index: true })
   sortOrder: number;
 
+  // Parent category for hierarchy
+  @Prop({ type: Types.ObjectId, ref: 'Category', default: null, index: true })
+  parentId?: Types.ObjectId | null;
+
   // Status number (no enum): 1 active, 0 inactive
   @Prop({ default: 1, index: true })
   status: number;

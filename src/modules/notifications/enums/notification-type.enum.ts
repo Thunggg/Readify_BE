@@ -3,5 +3,6 @@ export enum NotificationType {
   PROMOTION = 'PROMOTION',
   SYSTEM = 'SYSTEM',
   ACCOUNT = 'ACCOUNT',
+  REVIEW = 'REVIEW',
   OTHER = 'OTHER',
 }

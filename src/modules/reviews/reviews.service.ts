@@ -11,6 +11,8 @@ import { ErrorResponse } from 'src/shared/responses/error.response';
 import { AccountRole } from '../staff/constants/staff.enum';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/enums/notification-type.enum';
 
 @Injectable()
 export class ReviewsService {
@@ -19,6 +21,7 @@ export class ReviewsService {
     private readonly reviewModel: Model<ReviewDocument>,
     @InjectModel(Book.name)
     private readonly bookModel: Model<BookDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createReview(dto: CreateReviewDto, currentUserId: string) {
@@ -389,12 +392,16 @@ export class ReviewsService {
         .skip(skip)
         .limit(validLimit)
         .populate('userId', 'email firstName lastName')
+        .populate('adminReplyBy', 'email firstName lastName')
         .select({
           _id: 1,
           userId: 1,
           rating: 1,
           comment: 1,
           helpfulCount: 1,
+          adminReply: 1,
+          adminReplyAt: 1,
+          adminReplyBy: 1,
           createdAt: 1,
           updatedAt: 1,
         })
@@ -545,6 +552,29 @@ export class ReviewsService {
     review.adminReplyAt = new Date();
     review.adminReplyBy = new Types.ObjectId(adminUserId);
     await review.save();
+
+    // Send notification to the user
+    try {
+      // Find book to get its title
+      const book = await this.bookModel.findById(review.bookId);
+      const bookTitle = book ? book.title : 'sách của bạn';
+      
+      await this.notificationsService.createNotification(
+        {
+          title: 'Phản hồi mới từ Admin',
+          content: `Đội ngũ quản trị viên của chúng tôi vừa phản hồi đánh giá của bạn cho ${bookTitle}.`,
+          type: NotificationType.REVIEW as any,
+          metadata: {
+            reviewId: review._id.toString(),
+            bookId: review.bookId.toString()
+          }
+        },
+        review.userId.toString()
+      );
+    } catch (error) {
+      console.error('Failed to send notification for admin reply', error);
+      // Soft fail, we don't want to break the reply functionality if notification fails
+    }
 
     const reviewData = await this.reviewModel
       .findById(review._id)
