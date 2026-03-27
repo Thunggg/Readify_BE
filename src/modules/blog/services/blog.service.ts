@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { BlogPost, BlogPostDocument } from '../schemas/blog-post.schema';
 import { BlogCategory } from '../schemas/blog-category.schema';
+import { BlogComment } from '../schemas/blog-comment.schema';
 import { CreateBlogPostDto } from '../dto/create-blog-post.dto';
 import { UpdateBlogPostDto } from '../dto/update-blog-post.dto';
 import { BlogQueryDto } from '../dto/blog-query.dto';
@@ -14,6 +15,7 @@ export class BlogService {
   constructor(
     @InjectModel(BlogPost.name) private blogPostModel: Model<BlogPostDocument>,
     @InjectModel(BlogCategory.name) private categoryModel: Model<BlogCategory>,
+    @InjectModel(BlogComment.name) private commentModel: Model<BlogComment>,
   ) {}
 
   /**
@@ -101,7 +103,8 @@ export class BlogService {
    * Get list of articles for admin (all statuses)
    */
   async getAdminPosts(query: BlogQueryDto) {
-    const filter: Record<string, unknown> = { deletedAt: null };
+    const filter: Record<string, unknown> =
+      query.isDeleted === true ? { deletedAt: { $ne: null } } : { deletedAt: null };
 
     if (query.status) {
       filter.status = query.status;
@@ -347,6 +350,8 @@ export class BlogService {
       throw new NotFoundException('Article does not exist');
     }
 
+    const previousStatus = existingPost.status;
+
     const updateData: Record<string, unknown> = { ...updateBlogPostDto };
 
     if (updateBlogPostDto.tags) {
@@ -383,6 +388,31 @@ export class BlogService {
       .populate('author', 'firstName lastName avatarUrl')
       .lean();
 
+    const nextStatus = updatedPost?.status;
+    if (previousStatus !== nextStatus) {
+      if (nextStatus === 'published') {
+        await this.commentModel.updateMany({ post: existingPost._id }, { $set: { deletedAt: null } });
+        const approvedCount = await this.commentModel.countDocuments({
+          post: existingPost._id,
+          status: 'approved',
+          deletedAt: null,
+        });
+        await this.blogPostModel.updateOne({ _id: existingPost._id }, { $set: { commentCount: approvedCount } });
+        if (updatedPost) {
+          (updatedPost as any).commentCount = approvedCount;
+        }
+      } else {
+        await this.commentModel.updateMany(
+          { post: existingPost._id, deletedAt: null },
+          { $set: { deletedAt: new Date() } },
+        );
+        await this.blogPostModel.updateOne({ _id: existingPost._id }, { $set: { commentCount: 0 } });
+        if (updatedPost) {
+          (updatedPost as any).commentCount = 0;
+        }
+      }
+    }
+
     return new SuccessResponse(updatedPost, 'Successfully updated article');
   }
 
@@ -395,10 +425,43 @@ export class BlogService {
       throw new NotFoundException('Article does not exist');
     }
 
+    if (post.deletedAt) {
+      throw new BadRequestException('Article has already been deleted');
+    }
+
     await this.blogPostModel.updateOne({ slug }, { deletedAt: new Date() });
+    await this.commentModel.updateMany({ post: post._id, deletedAt: null }, { $set: { deletedAt: new Date() } });
     await this.categoryModel.findByIdAndUpdate(post.category, { $inc: { postCount: -1 } });
+    await this.blogPostModel.updateOne({ _id: post._id }, { $set: { commentCount: 0 } });
 
     return new SuccessResponse(null, 'Successfully deleted article');
+  }
+
+  /**
+   * Restore soft-deleted article
+   */
+  async restoreAdminPost(slug: string) {
+    const post = await this.blogPostModel.findOne({ slug });
+    if (!post) {
+      throw new NotFoundException('Article does not exist');
+    }
+
+    if (!post.deletedAt) {
+      throw new BadRequestException('Article is not deleted');
+    }
+
+    await this.blogPostModel.updateOne({ slug }, { deletedAt: null });
+    await this.commentModel.updateMany({ post: post._id }, { $set: { deletedAt: null } });
+    await this.categoryModel.findByIdAndUpdate(post.category, { $inc: { postCount: 1 } });
+
+    const approvedCount = await this.commentModel.countDocuments({
+      post: post._id,
+      status: 'approved',
+      deletedAt: null,
+    });
+    await this.blogPostModel.updateOne({ _id: post._id }, { $set: { commentCount: approvedCount } });
+
+    return new SuccessResponse(null, 'Successfully restored article');
   }
 
   private generateSlug(title: string): string {

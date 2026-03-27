@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Delete,
+  Patch,
   Put,
   UseGuards,
   Request,
@@ -91,5 +92,11 @@ export class BlogController {
   @UseGuards(JwtAuthGuard)
   async deleteAdminPost(@Param('slug') slug: string) {
     return this.blogService.deleteAdminPost(slug);
+  }
+
+  @Patch('posts/:slug/restore')
+  @UseGuards(JwtAuthGuard)
+  async restoreAdminPost(@Param('slug') slug: string) {
+    return this.blogService.restoreAdminPost(slug);
   }
 }

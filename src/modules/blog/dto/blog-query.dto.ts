@@ -1,5 +1,6 @@
 import { IsOptional, IsString, IsMongoId, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean } from 'class-validator';
 
 export class BlogQueryDto {
   @IsOptional()
@@ -46,4 +47,18 @@ export class BlogQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  isDeleted?: boolean;
 }

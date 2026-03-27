@@ -4,7 +4,7 @@ import { IsUniqueArray } from '../../../shared/decorators';
 
 export class CreateBlogPostDto {
   @IsString()
-  @MinLength(10)
+  @MinLength(2)
   @MaxLength(200)
   title: string;
 
