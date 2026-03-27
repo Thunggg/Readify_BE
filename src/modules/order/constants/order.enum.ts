@@ -1,3 +1,13 @@
+// ===== ACCOUNT ROLE =====
+export const AccountRole = {
+  USER: 0,
+  ADMIN: 1,
+  SELLER: 2,
+  WAREHOUSE: 3,
+} as const;
+
+export type AccountRoleValue = (typeof AccountRole)[keyof typeof AccountRole];
+
 export const OrderStatus = {
   PENDING: 'PENDING',
   CONFIRMED: 'CONFIRMED',

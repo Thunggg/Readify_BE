@@ -2,12 +2,14 @@
 import { Injectable, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
+import { ObjectId } from 'mongodb';
 
 import { Order, OrderDocument } from './schemas/order.schema';
 import { SearchOrderDto } from './dto/search-order.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
-import { OrderSortBy, SortOrder } from './constants/order.enum';
+import { ReorderDto } from './dto/reorder.dto';
+import { OrderSortBy, SortOrder, AccountRole } from './constants/order.enum';
 import { Account, AccountDocument } from '../accounts/schemas/account.schema';
 import { Promotion, PromotionDocument } from '../promotion/schemas/promotion.schema';
 import { Cart, CartDocument } from '../cart/schemas/cart.schema';
@@ -20,11 +22,15 @@ import { SuccessResponse } from '../../shared/responses/success.response';
 
 @Injectable()
 export class OrderService {
-  // 0: user, 1: admin, 2: seller, 3: warehouse, 4: staff, 5: seller
-  private readonly ALLOWED_ROLES_VIEW_ALL = [1, 2, 3]; // Admin, Warehouse, Staff
-  private readonly ALLOWED_ROLES_VIEW_DETAIL = [0, 1, 2, 3]; // Admin, Warehouse, Staff, Customer
-  private readonly ALLOWED_ROLES_CREATE = [0]; //  Customer
-  private readonly ALLOWED_ROLES_UPDATE = [1, 2, 3]; // Admin, Warehouse, Staff
+  private readonly ALLOWED_ROLES_VIEW_ALL: number[] = [AccountRole.ADMIN, AccountRole.SELLER, AccountRole.WAREHOUSE]; // Admin, Seller, Warehouse
+  private readonly ALLOWED_ROLES_VIEW_DETAIL: number[] = [
+    AccountRole.USER,
+    AccountRole.ADMIN,
+    AccountRole.SELLER,
+    AccountRole.WAREHOUSE,
+  ];
+  private readonly ALLOWED_ROLES_CREATE: number[] = [AccountRole.USER];
+  private readonly ALLOWED_ROLES_UPDATE: number[] = [AccountRole.ADMIN, AccountRole.SELLER, AccountRole.WAREHOUSE]; // Admin, Seller, Warehouse
 
   constructor(
     @InjectModel(Order.name)
@@ -244,6 +250,17 @@ export class OrderService {
 
     if (Object.keys(updateData).length === 0) {
       throw new BadRequestException('No valid fields to update');
+    }
+
+    // If status is being changed to COMPLETED, update book soldCount
+    if (updateData.status === 'COMPLETED' && currentStatus !== 'COMPLETED') {
+      const orderWithItems = await this.orderModel.findById(orderId).lean();
+      if (orderWithItems && orderWithItems.items && orderWithItems.items.length > 0) {
+        // Update soldCount for each book in the order
+        for (const item of orderWithItems.items) {
+          await this.bookModel.findByIdAndUpdate(item.bookId, { $inc: { soldCount: item.quantity } }, { new: true });
+        }
+      }
     }
 
     const updatedOrder = await this.orderModel
@@ -511,17 +528,28 @@ export class OrderService {
       throw new BadRequestException('Some books not found in stock');
     }
 
+    const books = await this.bookModel
+      .find({ _id: { $in: bookIds } })
+      .select('basePrice')
+      .lean();
+
     const stockMap = new Map(stocks.map((stock) => [stock.bookId.toString(), stock]));
+    const bookMap = new Map(books.map((book) => [book._id.toString(), book]));
 
     const items = cartItems.map((cartItem) => {
       const stock = stockMap.get(cartItem.bookId.toString());
       if (!stock) {
         throw new BadRequestException(`Stock not found for book: ${cartItem.bookId.toString()}`);
       }
-      if (!stock.price || stock.price <= 0) {
+      const book = bookMap.get(cartItem.bookId.toString());
+      if (!book) {
+        throw new BadRequestException(`Book not found: ${cartItem.bookId.toString()}`);
+      }
+      const price = stock.price && stock.price > 0 ? stock.price : book.basePrice;
+      if (!price || price <= 0) {
         throw new BadRequestException(`Invalid price for book: ${cartItem.bookId.toString()}`);
       }
-      const unitPrice = stock.price;
+      const unitPrice = price;
       const subtotal = unitPrice * cartItem.quantity;
 
       return {
@@ -611,14 +639,7 @@ export class OrderService {
         }
       }
 
-      const lastOrder = await this.orderModel.findOne().sort({ createdAt: -1 }).session(session).lean();
-      let orderCode = 'ORD20250001';
-
-      if (lastOrder && lastOrder.orderCode) {
-        const lastNumber = parseInt(lastOrder.orderCode.replace('ORD', ''));
-        const nextNumber = lastNumber + 1;
-        orderCode = `ORD${nextNumber.toString().padStart(8, '0')}`;
-      }
+      const orderCode = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
       const [newOrder] = await this.orderModel.create(
         [
@@ -685,6 +706,237 @@ export class OrderService {
         .populate('promotionId', 'code name discountType discountValue')
         .lean();
       return new SuccessResponse(order, 'Order created from cart successfully');
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  async reorderFromPreviousOrder(reorderDto: ReorderDto, currentUser: string) {
+    if (!Types.ObjectId.isValid(currentUser)) {
+      throw new BadRequestException('Invalid user id');
+    }
+
+    if (!Types.ObjectId.isValid(reorderDto.orderId)) {
+      throw new BadRequestException('Invalid order id');
+    }
+
+    const user = await this.accountModel.findById(currentUser).select('role').lean();
+    if (!user) {
+      throw new ForbiddenException('User not found');
+    }
+
+    if (!this.ALLOWED_ROLES_CREATE.includes(user.role)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const previousOrder = await this.orderModel.findById(reorderDto.orderId).lean();
+    if (!previousOrder) {
+      throw new NotFoundException('Previous order not found');
+    }
+
+    if (previousOrder.userId.toString() !== currentUser) {
+      throw new ForbiddenException('You can only reorder from your own orders');
+    }
+
+    if (!previousOrder.items || previousOrder.items.length === 0) {
+      throw new BadRequestException('Previous order has no items');
+    }
+
+    // Validate shipping address
+    const shippingAddress = reorderDto.shippingAddress || previousOrder.shippingAddress;
+    if (!shippingAddress || shippingAddress.trim().length < 10) {
+      throw new BadRequestException('Shipping address must be at least 10 characters');
+    }
+
+    const orderUserId = new Types.ObjectId(currentUser);
+    const bookIds = previousOrder.items.map((item) => item.bookId);
+
+    // Check stock availability
+    const stocks = await this.stockModel.find({ bookId: { $in: bookIds } }).lean();
+
+    if (stocks.length !== bookIds.length) {
+      throw new BadRequestException('Some books from previous order are no longer available');
+    }
+
+    const books = await this.bookModel
+      .find({ _id: { $in: bookIds } })
+      .select('basePrice')
+      .lean();
+
+    const stockMap = new Map(stocks.map((stock) => [stock.bookId.toString(), stock]));
+    const bookMap = new Map(books.map((book) => [book._id.toString(), book]));
+
+    // Prepare items with current prices
+    const items = previousOrder.items.map((prevItem) => {
+      const stock = stockMap.get(prevItem.bookId.toString());
+      if (!stock) {
+        throw new BadRequestException(`Stock not found for book: ${prevItem.bookId.toString()}`);
+      }
+      const book = bookMap.get(prevItem.bookId.toString());
+      if (!book) {
+        throw new BadRequestException(`Book not found: ${prevItem.bookId.toString()}`);
+      }
+      const price = stock.price && stock.price > 0 ? stock.price : book.basePrice;
+      if (!price || price <= 0) {
+        throw new BadRequestException(`Invalid price for book: ${prevItem.bookId.toString()}`);
+      }
+      const unitPrice = price; // Use current price (stock or book basePrice), not old price
+      const subtotal = unitPrice * prevItem.quantity;
+
+      return {
+        bookId: prevItem.bookId,
+        quantity: prevItem.quantity,
+        unitPrice,
+        subtotal,
+      };
+    });
+
+    const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    let promotionId: Types.ObjectId | undefined;
+    let discountAmount = 0;
+
+    if (reorderDto.promotionCode) {
+      const promotion = await this.promotionModel
+        .findOne({ code: reorderDto.promotionCode.trim().toUpperCase() })
+        .lean();
+      if (!promotion) {
+        throw new NotFoundException('Promotion code not found');
+      }
+      if (promotion.status !== 'ACTIVE') {
+        throw new BadRequestException('Promotion is not active');
+      }
+      const now = new Date();
+      const startDate = new Date(promotion.startDate);
+      const endDate = new Date(promotion.endDate);
+      if (now < startDate) {
+        throw new BadRequestException('Promotion has not started yet');
+      }
+      if (now > endDate) {
+        throw new BadRequestException('Promotion has expired');
+      }
+      if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) {
+        throw new BadRequestException('Promotion usage limit has been reached');
+      }
+      if (promotion.usedByUsers && promotion.usedByUsers.some((id) => id.toString() === currentUser)) {
+        throw new BadRequestException('You have already used this promotion');
+      }
+      if (totalAmount < promotion.minOrderValue) {
+        throw new BadRequestException(`Minimum order value for this promotion is ${promotion.minOrderValue}`);
+      }
+      if (promotion.discountType === 'PERCENT') {
+        discountAmount = Math.floor((totalAmount * promotion.discountValue) / 100);
+        if (promotion.maxDiscount && discountAmount > promotion.maxDiscount) {
+          discountAmount = promotion.maxDiscount;
+        }
+      } else if (promotion.discountType === 'FIXED') {
+        discountAmount = promotion.discountValue;
+      }
+      promotionId = promotion._id;
+    }
+
+    const finalAmount = totalAmount - discountAmount;
+
+    if (finalAmount < 0) {
+      throw new BadRequestException('Invalid final amount');
+    }
+
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      const stockCollection = this.connection.db?.collection('stocks');
+      if (!stockCollection) {
+        throw new BadRequestException('Database connection error');
+      }
+
+      // Check stock quantity again within transaction
+      for (const item of items) {
+        const stock = await stockCollection.findOne({ bookId: new Types.ObjectId(item.bookId as any) }, { session });
+        if (!stock) {
+          throw new BadRequestException(`Stock not found for book ${item.bookId.toString()}`);
+        }
+        if (stock.quantity < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for book ${item.bookId.toString()}. Available: ${stock.quantity}`,
+          );
+        }
+        const result = await stockCollection.updateOne(
+          { bookId: new Types.ObjectId(item.bookId as any) },
+          { $inc: { quantity: -item.quantity } },
+          { session },
+        );
+
+        if (result.matchedCount === 0) {
+          throw new BadRequestException(`Failed to update stock for book ${item.bookId.toString()}`);
+        }
+      }
+
+      const orderCode = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const [newOrder] = await this.orderModel.create(
+        [
+          {
+            orderCode,
+            userId: orderUserId,
+            items,
+            status: 'PENDING',
+            totalAmount,
+            discountAmount,
+            finalAmount,
+            promotionId,
+            shippingAddress,
+            paymentMethod: previousOrder.paymentMethod,
+            paymentStatus: 'UNPAID',
+            note: reorderDto.note || `Reorder from ${previousOrder.orderCode}`,
+          },
+        ],
+        { session },
+      );
+
+      if (promotionId) {
+        const promotionResult = await this.promotionModel.findByIdAndUpdate(
+          promotionId,
+          {
+            $inc: { usedCount: 1 },
+            $addToSet: { usedByUsers: orderUserId },
+          },
+          { session },
+        );
+
+        if (!promotionResult) {
+          throw new BadRequestException('Failed to update promotion');
+        }
+        const promotionData = await this.promotionModel.findById(promotionId).session(session).lean();
+        if (promotionData) {
+          await this.promotionLogService.createLog({
+            promotionId: promotionId.toString(),
+            promotionCode: promotionData.code,
+            promotionName: promotionData.name,
+            action: 'APPLY',
+            performedBy: orderUserId.toString(),
+            newData: {
+              orderId: newOrder._id.toString(),
+              orderCode: orderCode,
+              discountAmount,
+              finalAmount,
+              totalAmount,
+            },
+            note: `Customer applied promotion ${promotionData.code} for reorder ${orderCode} from ${previousOrder.orderCode}`,
+          });
+        }
+      }
+
+      await session.commitTransaction();
+      const order = await this.orderModel
+        .findById(newOrder._id)
+        .populate('userId', 'firstName lastName email phone')
+        .populate('promotionId', 'code name discountType discountValue')
+        .lean();
+      return new SuccessResponse(order, `Order reordered from ${previousOrder.orderCode} successfully`);
     } catch (error) {
       await session.abortTransaction();
       throw error;
