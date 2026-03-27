@@ -2,6 +2,10 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Account, AccountDocument } from 'src/modules/accounts/schemas/account.schema';
+import { Model } from 'mongoose';
+import { AccountStatus } from 'src/modules/staff/constants/staff.enum';
 
 function cookieTokenExtractor(req: any): string | null {
   if (!req || !req.cookies) return null;
@@ -17,12 +21,15 @@ function cookieTokenExtractor(req: any): string | null {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectModel(Account.name) private readonly accountModel: Model<AccountDocument>,
+  ) {
     super({
       // Cookie-only auth: access token is stored in cookie "accessToken"
-      jwtFromRequest: ExtractJwt.fromExtractors([cookieTokenExtractor]),
-      ignoreExpiration: false,
-      secretOrKey: configService.get<string>('jwt.accessTokenSecret') as string,
+      jwtFromRequest: ExtractJwt.fromExtractors([cookieTokenExtractor]), // lấy token từ cookie
+      ignoreExpiration: false, // không bỏ qua token hết hạn
+      secretOrKey: configService.get<string>('jwt.accessTokenSecret') as string, // secret key để giải mã token
     });
   }
 
@@ -37,6 +44,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // 3. Nếu không có sub (userId) → token không hợp lệ
     if (!data.sub) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const account = await this.accountModel.findById(data.sub).select({ status: 1, isDeleted: 1 });
+
+    if (!account || account.isDeleted === true || account.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid token');
     }
 

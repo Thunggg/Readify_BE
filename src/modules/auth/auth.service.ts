@@ -118,17 +118,24 @@ export class AuthService {
       throw new HttpException(new ErrorResponse('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
     }
 
-    // 3) check email is verified or not
+    // 3.1) check email is verified or not
     if (account.status === AccountStatus.NOT_ACTIVE_EMAIL) {
       throw new HttpException(new ErrorResponse('Email is not verified', 'EMAIL_NOT_VERIFIED', 400), 400);
     }
 
+    // 3.2) check account is banned or not
     if (account.status === AccountStatus.BANNED) {
       throw new HttpException(new ErrorResponse('Account is banned', 'ACCOUNT_BANNED', 400), 400);
     }
 
+    // 3.3) check account is inactive or not
     if (account.status === AccountStatus.INACTIVE) {
       throw new HttpException(new ErrorResponse('Account is inactive', 'ACCOUNT_INACTIVE', 400), 400);
+    }
+
+    // 3.4) check account is deleted or not
+    if (account.isDeleted === true) {
+      throw new HttpException(new ErrorResponse('Account is deleted', 'ACCOUNT_DELETED', 400), 400);
     }
 
     // 4) generate access token and refresh token
@@ -158,17 +165,22 @@ export class AuthService {
     return new SuccessResponse({ accessToken, refreshToken }, 'Login successful', 200);
   }
 
-  async logout(token: string) {
-    if (!token) {
+  async logout(accessToken: string, refreshToken?: string) {
+    if (!accessToken) {
       throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
     }
 
     const userId = this.jwtUtil.verifyAccessToken(
-      token,
+      accessToken,
       this.configService.get<string>('jwt.accessTokenSecret') as string,
     ).sub;
 
-    await this.refreshTokenModel.deleteOne({ userId });
+    // revoke current session if we have refreshToken cookie, otherwise revoke all sessions for safety
+    if (refreshToken) {
+      await this.refreshTokenModel.deleteOne({ userId, token: refreshToken });
+    } else {
+      await this.refreshTokenModel.deleteMany({ userId });
+    }
     return new SuccessResponse('Logged out successfully', 'LOGOUT_SUCCESS', 200);
   }
 
@@ -188,7 +200,10 @@ export class AuthService {
       }
 
       // 2) tìm refresh token trong database
-      const refreshTokenDocument = await this.refreshTokenModel.findOne({ token: refreshToken });
+      const refreshTokenDocument = await this.refreshTokenModel.findOne({
+        token: refreshToken,
+        userId: verifiedRefreshToken.sub as unknown as ObjectId,
+      });
 
       if (!refreshTokenDocument) {
         throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
@@ -201,14 +216,30 @@ export class AuthService {
         throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
       }
 
-      // 4) tao access token moi
+      // Enforce business rules on refresh
+      if (account.isDeleted === true || account.status !== AccountStatus.ACTIVE) {
+        throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
+      }
+
+      // 4) rotate refresh token + issue new access token
       const accessToken = this.jwtUtil.signAccessToken(
         { sub: account._id as unknown as ObjectId, email: account.email, role: account.role },
         this.configService.get<string>('jwt.accessTokenSecret') as string,
         this.configService.get<number>('jwt.accessTokenExpiresIn') as number,
       );
 
-      return new SuccessResponse({ accessToken }, 'Refresh token successful', 200);
+      const newRefreshToken = this.jwtUtil.signRefreshToken(
+        { sub: account._id as unknown as ObjectId },
+        this.configService.get<string>('jwt.refreshTokenSecret') as string,
+        this.configService.get<number>('jwt.refreshTokenExpiresIn') as number,
+      );
+
+      await this.refreshTokenModel.updateOne(
+        { _id: refreshTokenDocument._id },
+        { $set: { token: newRefreshToken, updatedAt: new Date(), lastUsedAt: new Date() } },
+      );
+
+      return new SuccessResponse({ accessToken, refreshToken: newRefreshToken }, 'Refresh token successful', 200);
     } catch (error) {
       throw new HttpException(new ErrorResponse('Unauthorized', 'UNAUTHORIZED', 401), 401);
     }
