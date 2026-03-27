@@ -372,6 +372,10 @@ export class BlogCommentsService {
       throw new NotFoundException('Bình luận không tồn tại');
     }
 
+    if (comment.status === 'deleted') {
+      return new SuccessResponse(null, 'Comment already deleted');
+    }
+
     // Collect all descendants (multi-level replies) so delete works correctly for nested reply trees.
     const idsToDelete: Types.ObjectId[] = [comment._id as Types.ObjectId];
     let frontier: Types.ObjectId[] = [comment._id as Types.ObjectId];
@@ -399,7 +403,15 @@ export class BlogCommentsService {
       status: 'approved',
     });
 
-    await this.commentModel.deleteMany({ _id: { $in: idsToDelete } });
+    await this.commentModel.updateMany(
+      { _id: { $in: idsToDelete } },
+      {
+        $set: {
+          status: 'deleted',
+          content: 'Comment đã bị xoá',
+        },
+      },
+    );
 
     if (approvedCount > 0) {
       const post = await this.blogPostModel.findById(comment.post).select({ status: 1, deletedAt: 1 }).lean();
