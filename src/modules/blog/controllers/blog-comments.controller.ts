@@ -3,8 +3,10 @@ import { BlogCommentsService } from '../services/blog-comments.service';
 import { CreateCommentDto } from '../dto/create-comment.dto';
 import { BlogCommentQueryDto } from '../dto/blog-comment-query.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('blog/comments')
+@ApiTags('Blog Comments')
 export class BlogCommentsController {
   constructor(private readonly commentsService: BlogCommentsService) {}
 

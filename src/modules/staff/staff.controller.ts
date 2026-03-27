@@ -10,9 +10,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { AccountRole } from './constants/staff.enum';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.ADMIN)
+@ApiTags('Staff')
+@ApiBearerAuth()
 @Controller('staff')
 export class StaffController {
   constructor(private readonly staffService: StaffService) {}

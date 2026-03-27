@@ -6,9 +6,12 @@ import { AccountRole } from '../staff/constants/staff.enum';
 import { TicketsService } from './tickets.service';
 import { ReplyTicketDto } from './dto/reply-ticket';
 import { GetTicketsQueryDto } from './dto/get-ticket-query';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.ADMIN)
+@ApiTags('Tickets (Admin)')
+@ApiBearerAuth()
 @Controller('admin/tickets')
 export class AdminTicketsController {
   constructor(private readonly ticketsService: TicketsService) {}

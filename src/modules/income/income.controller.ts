@@ -1,50 +1,66 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { IncomeService } from './income.service';
-import {
-  IncomeStatisticsDto,
-  TopSellingDto,
-  RecentOrdersDto,
-  ExportIncomeDto,
-} from './dto/income-statistics.dto';
+import { IncomeStatisticsDto, TopSellingDto, RecentOrdersDto } from './dto/income-statistics.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { AccountRole } from '../staff/constants/staff.enum';
+import { SuccessResponse } from '../../shared/responses/success.response';
+
+type AuthenticatedRequest = {
+  user: {
+    userId: string;
+  };
+};
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('income')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.ADMIN, AccountRole.SELLER)
+@ApiTags('Income')
+@ApiBearerAuth()
 export class IncomeController {
   constructor(private readonly incomeService: IncomeService) {}
 
   @Get('overview')
-  getOverview(@Req() req: any) {
-    return this.incomeService.getOverviewStats(req.user.userId);
+  async getOverview(@Req() req: AuthenticatedRequest): Promise<SuccessResponse<unknown>> {
+    const response = await this.incomeService.getOverviewStats(req.user.userId);
+    return response as SuccessResponse<unknown>;
   }
 
   @Get('statistics')
-  getStatistics(@Query() query: IncomeStatisticsDto, @Req() req: any) {
-    return this.incomeService.getIncomeStatistics(query, req.user.userId);
+  async getStatistics(
+    @Query() query: IncomeStatisticsDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<SuccessResponse<unknown>> {
+    const response = await this.incomeService.getIncomeStatistics(query, req.user.userId);
+    return response as SuccessResponse<unknown>;
   }
 
   @Get('categories')
-  getCategoryStats(@Query() query: IncomeStatisticsDto, @Req() req: any) {
-    return this.incomeService.getCategoryStatistics(query, req.user.userId);
+  async getCategoryStats(
+    @Query() query: IncomeStatisticsDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<SuccessResponse<unknown>> {
+    const response = await this.incomeService.getCategoryStatistics(query, req.user.userId);
+    return response as SuccessResponse<unknown>;
   }
 
   @Get('top-selling')
-  getTopSelling(@Query() query: TopSellingDto, @Req() req: any) {
-    return this.incomeService.getTopSellingBooks(query, req.user.userId);
+  async getTopSelling(
+    @Query() query: TopSellingDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<SuccessResponse<unknown>> {
+    const response = await this.incomeService.getTopSellingBooks(query, req.user.userId);
+    return response as SuccessResponse<unknown>;
   }
 
   @Get('recent-orders')
-  getRecentOrders(@Query() query: RecentOrdersDto, @Req() req: any) {
-    return this.incomeService.getRecentOrders(query, req.user.userId);
-  }
-
-  @Get('export')
-  exportIncome(@Query() query: ExportIncomeDto, @Req() req: any) {
-    return this.incomeService.exportIncome(query, req.user.userId);
+  async getRecentOrders(
+    @Query() query: RecentOrdersDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<SuccessResponse<unknown>> {
+    const response = await this.incomeService.getRecentOrders(query, req.user.userId);
+    return response as SuccessResponse<unknown>;
   }
 }

@@ -4,8 +4,10 @@ import { SearchBookSuggestionsDto } from '../dto/search-book-suggestions.dto';
 import { BooksPublicService } from '../services/books.public.service';
 import { BookSlugDto } from '../dto/book-slug.dto';
 import { BookIdDto } from '../dto/book-id.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('book')
+@ApiTags('Books')
 export class BooksPublicController {
   constructor(private readonly booksPublicService: BooksPublicService) {}
 

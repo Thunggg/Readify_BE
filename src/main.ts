@@ -5,6 +5,7 @@ import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { ValidationError } from 'class-validator';
 import { ErrorResponse } from 'src/shared/responses/error.response';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -38,6 +39,21 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = Number(configService.get<string>('port') ?? 3000);
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Readify API')
+    .setDescription('API documentation')
+    .setVersion('1.0.0')
+    .addBearerAuth()
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
+
   await app.listen(port);
 }
 void bootstrap();

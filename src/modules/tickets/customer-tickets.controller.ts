@@ -8,9 +8,12 @@ import { CreateTicketDto } from './dto/create-ticket-customer';
 import { ReplyTicketDto } from './dto/reply-ticket';
 import { GetTicketsQueryDto } from './dto/get-ticket-query';
 import { RatingTicketDto } from './dto/rating-ticket';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.USER)
+@ApiTags('Tickets')
+@ApiBearerAuth()
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}

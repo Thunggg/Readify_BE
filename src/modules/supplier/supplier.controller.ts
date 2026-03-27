@@ -7,10 +7,13 @@ import { SupplierIdDto } from './dto/supplier-id.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('suppliers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(1, 3) // Admin = 1, Warehouse Staff = 3
+@ApiTags('Suppliers')
+@ApiBearerAuth()
 export class SupplierController {
   constructor(private readonly supplierService: SupplierService) {}
 
