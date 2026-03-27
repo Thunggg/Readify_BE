@@ -27,9 +27,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   ) {
     super({
       // Cookie-only auth: access token is stored in cookie "accessToken"
-      jwtFromRequest: ExtractJwt.fromExtractors([cookieTokenExtractor]),
-      ignoreExpiration: false,
-      secretOrKey: configService.get<string>('jwt.accessTokenSecret') as string,
+      jwtFromRequest: ExtractJwt.fromExtractors([cookieTokenExtractor]), // lấy token từ cookie
+      ignoreExpiration: false, // không bỏ qua token hết hạn
+      secretOrKey: configService.get<string>('jwt.accessTokenSecret') as string, // secret key để giải mã token
     });
   }
 

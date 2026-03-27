@@ -43,8 +43,9 @@ export class TicketsService {
       pipeline.push({ $match: { status: { $in: statusFilter } } });
     }
 
-    // Populate customerId and assignedToId (for search/sort)
+    // Populate customerId and assignedToId cho việc search/sort
     pipeline.push(
+      // nối ticket với account customerId
       {
         $lookup: {
           from: 'accounts',
@@ -53,6 +54,11 @@ export class TicketsService {
           as: 'customerId',
         },
       },
+      // phân rã customerId thành từng document
+      // Vì trước đó bạn dùng $lookup:
+      // customerId: [ { _id, email, ... } ]
+      // $unwind sẽ biến thành customerId thành từng document:
+      // customerId: { _id, email, ... }
       {
         $unwind: {
           path: '$customerId',

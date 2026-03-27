@@ -118,15 +118,17 @@ export class AuthService {
       throw new HttpException(new ErrorResponse('Email or password is incorrect', 'INVALID_CREDENTIALS', 400), 400);
     }
 
-    // 3) check email is verified or not
+    // 3.1) check email is verified or not
     if (account.status === AccountStatus.NOT_ACTIVE_EMAIL) {
       throw new HttpException(new ErrorResponse('Email is not verified', 'EMAIL_NOT_VERIFIED', 400), 400);
     }
 
+    // 3.2) check account is banned or not
     if (account.status === AccountStatus.BANNED) {
       throw new HttpException(new ErrorResponse('Account is banned', 'ACCOUNT_BANNED', 400), 400);
     }
 
+    // 3.3) check account is inactive or not
     if (account.status === AccountStatus.INACTIVE) {
       throw new HttpException(new ErrorResponse('Account is inactive', 'ACCOUNT_INACTIVE', 400), 400);
     }
