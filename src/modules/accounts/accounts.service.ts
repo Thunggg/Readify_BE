@@ -151,11 +151,11 @@ export class AccountsService {
     if (dto.firstName !== undefined) account.firstName = dto.firstName.trim().replace(/\s+/g, ' ');
     if (dto.lastName !== undefined) account.lastName = dto.lastName.trim().replace(/\s+/g, ' ');
     if (dto.dateOfBirth !== undefined) account.dateOfBirth = dto.dateOfBirth;
-    if (dto.phone !== undefined) account.phone = dto.phone;
-    if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
-    if (dto.address !== undefined) account.address = dto.address;
+    if (dto.phone !== undefined) account.phone = dto.phone.trim().replace(/\s+/g, ' ');
+    if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl.trim().replace(/\s+/g, ' ');
+    if (dto.address !== undefined) account.address = dto.address.trim().replace(/\s+/g, ' ');
     if (dto.sex !== undefined) account.sex = dto.sex;
-    if (dto.bio !== undefined) account.bio = dto.bio;
+    if (dto.bio !== undefined) account.bio = dto.bio.trim().replace(/\s+/g, ' ');
 
     const saved = await account.save();
     const { password, ...accountData } = saved.toObject();

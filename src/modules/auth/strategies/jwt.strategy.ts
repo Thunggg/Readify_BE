@@ -47,9 +47,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid token');
     }
 
-    const account = await this.accountModel.findOne({ email: data.email });
+    const account = await this.accountModel.findById(data.sub).select({ status: 1, isDeleted: 1 });
 
-    if (!account || account.status !== AccountStatus.ACTIVE) {
+    if (!account || account.isDeleted === true || account.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid token');
     }
 

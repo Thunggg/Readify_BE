@@ -89,7 +89,10 @@ export class AuthController {
   @ApiBearerAuth()
   @Post('logout')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.logout(req?.cookies?.accessToken as string);
+    const response = await this.authService.logout(
+      req?.cookies?.accessToken as string,
+      req?.cookies?.refreshToken as string,
+    );
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
     return response;
