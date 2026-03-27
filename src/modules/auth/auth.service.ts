@@ -127,6 +127,10 @@ export class AuthService {
       throw new HttpException(new ErrorResponse('Account is banned', 'ACCOUNT_BANNED', 400), 400);
     }
 
+    if (account.status === AccountStatus.INACTIVE) {
+      throw new HttpException(new ErrorResponse('Account is inactive', 'ACCOUNT_INACTIVE', 400), 400);
+    }
+
     // 4) generate access token and refresh token
     const accessToken = this.jwtUtil.signAccessToken(
       { sub: account._id as unknown as ObjectId, email: account.email, role: account.role },
