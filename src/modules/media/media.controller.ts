@@ -20,6 +20,20 @@ export class MediaController {
     return this.mediaService.uploadAvatar(file, dto, userId as string);
   }
 
+  @Post('upload/avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    const userId = req.user.userId ?? '';
+    return this.mediaService.uploadAvatar(file, userId as string);
+  }
+
+  @Post('upload/book')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBook(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    const userId = req.user.userId ?? '';
+    return this.mediaService.uploadBookImage(file, userId as string);
+  }
+
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: any) {
     const userId = req.user.userId;

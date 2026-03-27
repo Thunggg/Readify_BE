@@ -23,6 +23,24 @@ import { TrendingRecommendationsDto } from '../dto/trending-recommendations.dto'
 export class BooksAdminService {
   private readonly logger = new Logger(BooksAdminService.name);
 
+  private mapAndThrowDuplicateKeyError(error: unknown): void {
+    if (!error || typeof error !== 'object') return;
+
+    const duplicateKeyError = error as {
+      code?: number;
+      keyPattern?: Record<string, unknown>;
+      keyValue?: Record<string, unknown>;
+    };
+
+    if (duplicateKeyError.code !== 11000) return;
+
+    const keySource = duplicateKeyError.keyPattern ?? duplicateKeyError.keyValue ?? {};
+    const field = Object.keys(keySource)[0] ?? 'field';
+    const message = `${field.toUpperCase()} already exists`;
+
+    throw new HttpException(ErrorResponse.validationError([{ field, message }]), HttpStatus.BAD_REQUEST);
+  }
+
   constructor(
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Book.name) private readonly bookModel: Model<BookDocument>,
@@ -601,6 +619,20 @@ export class BooksAdminService {
    * Validates: slug, ISBN, publisher, categories, authors, images
    */
   async addBook(dto: CreateBookDto) {
+    if (dto.basePrice == null || dto.basePrice <= 0) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'basePrice', message: 'Base price must be greater than 0' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.initialQuantity == null || dto.initialQuantity <= 0) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'initialQuantity', message: 'Initial quantity must be greater than 0' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     // ===== XỬ LÝ SLUG TỰ ĐỘNG =====
     const slugSource = dto.slug?.trim() || dto.title.trim();
 
@@ -853,6 +885,8 @@ export class BooksAdminService {
     } catch (error) {
       this.logger.error(`Failed to create book: ${error.message}`, error.stack);
 
+      this.mapAndThrowDuplicateKeyError(error);
+
       // Nếu đã là HttpException thì re-throw
       if (error instanceof HttpException) {
         throw error;
@@ -865,6 +899,20 @@ export class BooksAdminService {
   }
 
   async updateBook(id: string, dto: UpdateBookDto) {
+    if (dto.basePrice == null || dto.basePrice <= 0) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'basePrice', message: 'Base price must be greater than 0' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (dto.stockQuantity == null || dto.stockQuantity <= 0) {
+      throw new HttpException(
+        ErrorResponse.validationError([{ field: 'stockQuantity', message: 'Stock quantity must be greater than 0' }]),
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     if (!Types.ObjectId.isValid(id)) {
       throw new HttpException(
         ErrorResponse.validationError([{ field: 'id', message: 'Invalid book id' }]),
@@ -895,7 +943,15 @@ export class BooksAdminService {
         if (dto.subtitle !== undefined) book.subtitle = dto.subtitle?.trim();
         if (dto.description !== undefined) book.description = dto.description?.trim();
         if (dto.language !== undefined) book.language = dto.language?.trim() as any;
-        if (dto.publishDate !== undefined) book.publishDate = dto.publishDate;
+        if (dto.publishDate !== undefined) {
+          if (dto.publishDate && new Date(dto.publishDate) > new Date()) {
+            throw new HttpException(
+              ErrorResponse.validationError([{ field: 'publishDate', message: 'Publish date cannot be in the future' }]),
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+          book.publishDate = dto.publishDate;
+        }
         if (dto.pageCount !== undefined) book.pageCount = dto.pageCount;
         if (dto.basePrice !== undefined) book.basePrice = dto.basePrice;
         if (dto.currency !== undefined) book.currency = (dto.currency?.trim() || 'VND') as any;
@@ -915,18 +971,35 @@ export class BooksAdminService {
           }
 
           if (slug !== book.slug) {
-            const exists = await this.bookModel.exists({
-              slug,
-              isDeleted: false,
-              _id: { $ne: book._id },
-            });
-            if (exists) {
-              throw new HttpException(
-                ErrorResponse.validationError([{ field: 'slug', message: 'Slug already exists' }]),
-                HttpStatus.BAD_REQUEST,
-              );
+            let finalSlug = slug;
+            let counter = 1;
+
+            while (
+              await this.bookModel
+                .exists({
+                  slug: finalSlug,
+                  isDeleted: false,
+                  _id: { $ne: book._id },
+                })
+                .session(session)
+            ) {
+              finalSlug = `${slug}-${counter}`;
+              counter++;
+
+              if (counter > 100) {
+                throw new HttpException(
+                  ErrorResponse.validationError([
+                    {
+                      field: 'slug',
+                      message: 'Cannot generate unique slug. Please provide a different title or slug.',
+                    },
+                  ]),
+                  HttpStatus.BAD_REQUEST,
+                );
+              }
             }
-            book.slug = slug;
+
+            book.slug = finalSlug;
           }
         }
 
@@ -1055,7 +1128,25 @@ export class BooksAdminService {
 
         // ===== 3.4) Update isbn if provided =====
         if (dto.isbn !== undefined) {
-          book.isbn = dto.isbn?.trim() || undefined;
+          const nextIsbn = dto.isbn?.trim() || undefined;
+          if (nextIsbn && nextIsbn !== book.isbn) {
+            const isbnExists = await this.bookModel
+              .exists({
+                isbn: nextIsbn,
+                isDeleted: false,
+                _id: { $ne: book._id },
+              })
+              .session(session);
+
+            if (isbnExists) {
+              throw new HttpException(
+                ErrorResponse.validationError([{ field: 'isbn', message: 'ISBN already exists' }]),
+                HttpStatus.BAD_REQUEST,
+              );
+            }
+          }
+
+          book.isbn = nextIsbn;
         }
 
         // ===== 4) MEDIA =====
@@ -1153,6 +1244,8 @@ export class BooksAdminService {
     } catch (error) {
       this.logger.error(`Failed to update book: ${error.message}`, error.stack);
 
+      this.mapAndThrowDuplicateKeyError(error);
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -1183,6 +1276,17 @@ export class BooksAdminService {
         if (book.isDeleted) {
           throw new HttpException(
             ErrorResponse.validationError([{ field: 'id', message: 'Book already deleted' }]),
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        const hasAnyOrder = await this.orderModel
+          .exists({ 'items.bookId': book._id })
+          .session(session);
+
+        if (hasAnyOrder) {
+          throw new HttpException(
+            ErrorResponse.validationError([{ field: 'id', message: 'Book already exists in order history and cannot be deleted' }]),
             HttpStatus.BAD_REQUEST,
           );
         }
