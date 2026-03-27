@@ -14,7 +14,7 @@ export default () => ({
       family: 4, // Dùng IPv4
     },
   },
-
+  
   // JWT
   jwt: {
     accessTokenSecret: process.env.ACCESS_TOKEN_SECRET,

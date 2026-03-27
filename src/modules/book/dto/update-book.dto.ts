@@ -68,7 +68,7 @@ export class UpdateBookDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(1)
   basePrice?: number;
 
   @IsOptional()
@@ -107,7 +107,7 @@ export class UpdateBookDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
+  @Min(1)
   stockQuantity?: number;
 
   @IsOptional()

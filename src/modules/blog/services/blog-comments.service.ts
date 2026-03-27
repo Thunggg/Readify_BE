@@ -4,6 +4,8 @@ import { Model, Types } from 'mongoose';
 import { BlogComment } from '../schemas/blog-comment.schema';
 import { BlogPost } from '../schemas/blog-post.schema';
 import { CreateCommentDto } from '../dto/create-comment.dto';
+import { BlogCommentQueryDto } from '../dto/blog-comment-query.dto';
+import { PaginatedResponse } from '../../../shared/responses/paginated.response';
 
 @Injectable()
 export class BlogCommentsService {
@@ -65,6 +67,61 @@ export class BlogCommentsService {
     });
 
     return { comments, total };
+  }
+
+  async getAdminComments(query: BlogCommentQueryDto) {
+    const filter: Record<string, unknown> = { deletedAt: null };
+
+    if (query.status) {
+      filter.status = query.status;
+    }
+
+    if (query.postId) {
+      filter.post = new Types.ObjectId(query.postId);
+    }
+
+    if (query.userId) {
+      filter.user = new Types.ObjectId(query.userId);
+    }
+
+    if (query.search) {
+      const regex = { $regex: query.search, $options: 'i' };
+      filter.$or = [
+        { content: regex },
+        { authorName: regex },
+        { authorEmail: regex },
+      ];
+    }
+
+    let sort: Record<string, 1 | -1> = { createdAt: -1 };
+    if (query.sortBy === 'oldest') {
+      sort = { createdAt: 1 };
+    }
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    const total = await this.commentModel.countDocuments(filter);
+
+    const comments = await this.commentModel
+      .find(filter)
+      .select({
+        post: 1,
+        user: 1,
+        authorName: 1,
+        authorEmail: 1,
+        content: 1,
+        status: 1,
+        parent: 1,
+        createdAt: 1,
+      })
+      .populate('post', 'title slug')
+      .populate('user', 'firstName lastName avatarUrl')
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    return new PaginatedResponse(comments, { page, limit, total }, 'Successfully retrieved comments');
   }
 
   async updateStatus(commentId: string, status: string) {

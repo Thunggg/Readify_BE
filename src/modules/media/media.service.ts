@@ -26,50 +26,66 @@ export class MediaService {
     return 'image'; // Mặc định là image
   }
 
-  // Upload avatar cho tài khoản, lưu lên Cloudinary và cập nhật avatarUrl của account
-  async uploadAvatar(file: Express.Multer.File, dto: UploadMediaDto, uploadedBy?: string) {
+  // Upload media dùng chung, chỉ lưu media document và không cập nhật avatar account
+  async upload(file: Express.Multer.File, dto: UploadMediaDto, uploadedBy?: string) {
     try {
-      // Kiểm tra file có buffer không (đảm bảo file đã được upload)
       if (!file?.buffer) throw new BadRequestException('Missing file buffer');
 
-      // Xác định loại media, mặc định là IMAGE
       const type = dto.type ?? MediaType.IMAGE;
 
-      // Upload file lên Cloudinary
       const uploaded = await this.cloudinaryService.uploadBuffer({
-        buffer: file.buffer, // Dữ liệu file
-        folder: dto.folder, // Thư mục trên Cloudinary
-        resourceType: this.mapTypeToResourceType(type), // Loại resource (image/video/raw)
-        filename: file.originalname, // Tên file gốc
+        buffer: file.buffer,
+        folder: dto.folder,
+        resourceType: this.mapTypeToResourceType(type),
+        filename: file.originalname,
       });
 
-      // Tạo document media trong database với trạng thái TEMP (tạm thời)
       const doc = await this.mediaModel.create({
-        url: uploaded.url, // URL từ Cloudinary
-        publicId: uploaded.publicId, // Public ID để quản lý trên Cloudinary
-        type, // Loại media
-        status: MediaStatus.TEMP, // Trạng thái tạm thời, có thể bị xóa bởi cron job
-        uploadedBy: uploadedBy ? new Types.ObjectId(uploadedBy) : undefined, // Người upload
-        folder: dto.folder as MediaFolder, // Thư mục
-        originalName: file.originalname, // Tên file gốc
-        mimeType: file.mimetype, // Loại MIME
-        size: file.size, // Kích thước file
+        url: uploaded.url,
+        publicId: uploaded.publicId,
+        type,
+        status: MediaStatus.TEMP,
+        uploadedBy: uploadedBy ? new Types.ObjectId(uploadedBy) : undefined,
+        folder: dto.folder as MediaFolder,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
       });
 
-      // Tìm account của người upload và cập nhật avatarUrl
-      const account = await this.accountModel.findById(uploadedBy);
-
-      if (account) {
-        account.avatarUrl = doc.url; // Cập nhật URL avatar
-        await account.save(); // Lưu thay đổi
-      }
-
-      // Trả về response thành công
       return new SuccessResponse(doc, 'Media uploaded successfully', HttpStatus.CREATED);
     } catch (error) {
-      // Nếu có lỗi, throw BadRequestException với message từ error
       throw new BadRequestException(error.message);
     }
+  }
+
+  // Upload avatar cho tài khoản, lưu lên Cloudinary và cập nhật avatarUrl của account
+  async uploadAvatar(file: Express.Multer.File, dtoOrUploadedBy?: UploadMediaDto | string, uploadedBy?: string) {
+    const dto =
+      typeof dtoOrUploadedBy === 'string'
+        ? { type: MediaType.IMAGE, folder: MediaFolder.USER }
+        : dtoOrUploadedBy ?? { type: MediaType.IMAGE, folder: MediaFolder.USER };
+
+    const finalUploadedBy = typeof dtoOrUploadedBy === 'string' ? dtoOrUploadedBy : uploadedBy;
+
+    const result = await this.upload(file, dto, finalUploadedBy);
+
+    const doc = result.data as MediaDocument;
+    const account = await this.accountModel.findById(finalUploadedBy);
+    if (account) {
+      account.avatarUrl = doc.url;
+      await account.save();
+    }
+
+    return result;
+  }
+
+  // Upload riêng cho ảnh sách, cố định folder = book và type = image
+  async uploadBookImage(file: Express.Multer.File, uploadedBy?: string) {
+    return this.upload(
+      file,
+      { type: MediaType.IMAGE, folder: MediaFolder.BOOK },
+      uploadedBy,
+    );
   }
 
   // Xóa media theo ID, kiểm tra quyền sở hữu và xóa trên Cloudinary

@@ -80,7 +80,7 @@ export class CreateBookDto {
 
   @Type(() => Number)
   @IsNumber({}, { message: 'Base price must be a number' })
-  @Min(0, { message: 'Base price must be greater than or equal to 0' })
+  @Min(1, { message: 'Base price must be greater than 0' })
   @Max(10000000000, { message: 'Base price must be less than or equal to 10,000,000,000  (10 billion)' })
   basePrice: number;
 
@@ -118,12 +118,11 @@ export class CreateBookDto {
   @IsString({ each: true, message: 'Each tag must be a string' })
   tags?: string[];
 
-  @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Initial quantity must be an integer' })
-  @Min(0, { message: 'Initial quantity cannot be negative' })
+  @Min(1, { message: 'Initial quantity must be greater than 0' })
   @Max(100000, { message: 'Initial quantity cannot exceed 100,000' })
-  initialQuantity?: number;
+  initialQuantity: number;
 
   @IsOptional()
   @IsString({ message: 'Stock location must be a string' })

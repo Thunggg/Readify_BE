@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { BlogPost, BlogPostDocument } from '../schemas/blog-post.schema';
@@ -19,7 +19,7 @@ export class BlogService {
   /**
    * Get list of articles (public: only published, admin: according to status)
    */
-  async findAll(query: BlogQueryDto) {
+  async getPublicPosts(query: BlogQueryDto) {
     const filter: Record<string, unknown> = { deletedAt: null };
 
     if (query.status) {
@@ -98,9 +98,89 @@ export class BlogService {
   }
 
   /**
+   * Get list of articles for admin (all statuses)
+   */
+  async getAdminPosts(query: BlogQueryDto) {
+    const filter: Record<string, unknown> = { deletedAt: null };
+
+    if (query.status) {
+      filter.status = query.status;
+    }
+
+    if (query.category) {
+      const category = await this.categoryModel.findOne({
+        slug: query.category,
+        deletedAt: null,
+      });
+      if (category) {
+        filter.category = category._id;
+      }
+    }
+
+    if (query.tag) {
+      filter.tags = query.tag;
+    }
+
+    if (query.author) {
+      filter.author = new Types.ObjectId(query.author);
+    }
+
+    if (query.search) {
+      const regex = { $regex: query.search, $options: 'i' };
+      filter.$or = [{ title: regex }, { excerpt: regex }, { content: regex }];
+    }
+
+    if (query.startDate || query.endDate) {
+      filter.createdAt = {
+        ...(query.startDate ? { $gte: query.startDate } : {}),
+        ...(query.endDate ? { $lte: query.endDate } : {}),
+      };
+    }
+
+    const sortBy = query.sortBy || 'newest';
+    const sortMap: Record<string, Record<string, 1 | -1>> = {
+      popular: { viewCount: -1 },
+      title: { title: 1 },
+      oldest: { createdAt: 1 },
+      publishedAt: { publishedAt: -1 },
+      newest: { createdAt: -1 },
+    };
+    const sort = sortMap[sortBy] || sortMap.newest;
+
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const total = await this.blogPostModel.countDocuments(filter);
+
+    const posts = await this.blogPostModel
+      .find(filter)
+      .select({
+        title: 1,
+        slug: 1,
+        excerpt: 1,
+        featuredImage: 1,
+        category: 1,
+        author: 1,
+        tags: 1,
+        viewCount: 1,
+        commentCount: 1,
+        status: 1,
+        publishedAt: 1,
+        createdAt: 1,
+      })
+      .populate('category', 'name slug')
+      .populate('author', 'firstName lastName avatarUrl')
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    return new PaginatedResponse(posts, { page, limit, total }, 'Successfully retrieved list of articles');
+  }
+
+  /**
    * Get article details by slug (public)
    */
-  async findBySlug(slug: string) {
+  async getPublicPostDetailBySlug(slug: string) {
     const post = await this.blogPostModel
       .findOne({ slug, deletedAt: null, status: 'published' })
       .populate('category', 'name slug description')
@@ -119,9 +199,31 @@ export class BlogService {
   }
 
   /**
+   * Get article details for admin
+   */
+  async getAdminPostDetail(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Article does not exist');
+    }
+
+    const post = await this.blogPostModel
+      .findOne({ _id: id, deletedAt: null })
+      .populate('category', 'name slug description')
+      .populate('author', 'firstName lastName avatarUrl')
+      .populate('book', 'title slug thumbnailUrl')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Article does not exist');
+    }
+
+    return new SuccessResponse(post, 'Successfully retrieved article details');
+  }
+
+  /**
    * Get related articles (same category or same tags)
    */
-  async getRelatedPosts(postId: string, limit: number = 4) {
+  async getPublicRelatedPosts(postId: string, limit: number = 4) {
     if (!Types.ObjectId.isValid(postId)) {
       return new SuccessResponse([], 'No related articles found');
     }
@@ -166,7 +268,7 @@ export class BlogService {
   /**
    * Get all blog categories (public)
    */
-  async getCategories() {
+  async getPublicCategories() {
     const categories = await this.categoryModel
       .find({ deletedAt: null })
       .select({ name: 1, slug: 1, description: 1, icon: 1, postCount: 1 })
@@ -179,7 +281,19 @@ export class BlogService {
   /**
    * Create new article (Admin/Staff)
    */
-  async create(createBlogPostDto: CreateBlogPostDto, authorId: string) {
+  async createAdminPost(createBlogPostDto: CreateBlogPostDto, authorId: string) {
+    if (!Types.ObjectId.isValid(authorId)) {
+      throw new BadRequestException('Invalid author id');
+    }
+
+    if (createBlogPostDto.bookId && !Types.ObjectId.isValid(createBlogPostDto.bookId)) {
+      throw new BadRequestException('Invalid book id');
+    }
+
+    if (!Types.ObjectId.isValid(createBlogPostDto.categoryId)) {
+      throw new BadRequestException('Invalid category id');
+    }
+
     let slug = this.generateSlug(createBlogPostDto.title);
 
     const existing = await this.blogPostModel.findOne({ slug });
@@ -193,6 +307,10 @@ export class BlogService {
       author: new Types.ObjectId(authorId),
       publishedAt: createBlogPostDto.status === 'published' ? new Date() : null,
     };
+
+    if (createBlogPostDto.tags) {
+      postData.tags = this.normalizeTags(createBlogPostDto.tags);
+    }
 
     if (createBlogPostDto.bookId) {
       postData.book = new Types.ObjectId(createBlogPostDto.bookId);
@@ -223,13 +341,17 @@ export class BlogService {
   /**
    * Update article
    */
-  async update(slug: string, updateBlogPostDto: UpdateBlogPostDto) {
+  async updateAdminPost(slug: string, updateBlogPostDto: UpdateBlogPostDto) {
     const existingPost = await this.blogPostModel.findOne({ slug });
     if (!existingPost) {
       throw new NotFoundException('Article does not exist');
     }
 
     const updateData: Record<string, unknown> = { ...updateBlogPostDto };
+
+    if (updateBlogPostDto.tags) {
+      updateData.tags = this.normalizeTags(updateBlogPostDto.tags);
+    }
 
     if (updateBlogPostDto.title && updateBlogPostDto.title !== existingPost.title) {
       let newSlug = this.generateSlug(updateBlogPostDto.title);
@@ -267,7 +389,7 @@ export class BlogService {
   /**
    * Soft delete article
    */
-  async delete(slug: string) {
+  async deleteAdminPost(slug: string) {
     const post = await this.blogPostModel.findOne({ slug });
     if (!post) {
       throw new NotFoundException('Article does not exist');
@@ -290,5 +412,24 @@ export class BlogService {
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  private normalizeTags(tags: string[]): string[] {
+    const normalizedTags = tags
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
+
+    const uniqueTags: string[] = [];
+    const seenTags = new Set<string>();
+
+    for (const tag of normalizedTags) {
+      const key = tag.toLowerCase();
+      if (!seenTags.has(key)) {
+        seenTags.add(key);
+        uniqueTags.push(tag);
+      }
+    }
+
+    return uniqueTags;
   }
 }
