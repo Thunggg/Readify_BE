@@ -426,7 +426,7 @@ export class AccountsService {
 
     switch (sortBy) {
       case StaffSortBy.CREATED_AT:
-        sortStage = { createdAt: 1 };
+        sortStage = { createdAt: direction };
         break;
       case StaffSortBy.EMAIL:
         sortStage = { email: direction };
@@ -472,7 +472,8 @@ export class AccountsService {
       });
     }
 
-    pipeline.push(this.buildSortStage(sortBy, order), { $skip: skip }, { $limit: limit });
+    // Security: aggregation does NOT honor schema `select: false`, so explicitly remove password from results
+    pipeline.push({ $project: { password: 0 } }, this.buildSortStage(sortBy, order), { $skip: skip }, { $limit: limit });
 
     return pipeline;
   }
@@ -670,14 +671,14 @@ export class AccountsService {
       throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
     }
 
-    // nếu tồn tại currentToken thì kiểm tra xem sessionId có trùng với currentToken không. Phần query nếu tìm thấy thì trả về object, ngược lại thì trả về null
-    const isCurrent = currentToken
-      ? (await this.refreshTokenModel.exists({
-          _id: { $in: sessionId },
-          userId,
-          token: currentToken,
-        })) !== null
-      : true; // nếu không tồn tại currentToken thì coi như tất cả sessionId đều là current session
+    // If currentToken is present, check whether it's among the sessions being revoked
+    const isCurrent =
+      !!currentToken &&
+      (await this.refreshTokenModel.exists({
+        _id: { $in: sessionId },
+        userId,
+        token: currentToken,
+      })) !== null;
 
     const deleted = await this.refreshTokenModel.deleteMany({ _id: { $in: sessionId }, userId });
 

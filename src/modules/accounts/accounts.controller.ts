@@ -33,6 +33,9 @@ import { BadRequestException } from '@nestjs/common';
 import { JwtUtil } from 'src/shared/utils/jwt';
 import { LogoutSessionDto } from './dto/logout-session.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Roles } from 'src/shared/decorators/roles.decorator';
+import { RolesGuard } from 'src/shared/guards/roles.guard';
+import { AccountRole } from 'src/modules/staff/constants/staff.enum';
 
 @Controller('accounts')
 @ApiTags('Accounts')
@@ -161,35 +164,40 @@ export class AccountsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
   @ApiBearerAuth()
   getAccountDetail(@Param() params: AccountIdDto) {
     return this.accountsService.getAccountDetail(params.id);
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
   @ApiBearerAuth()
   getAccountList(@Query() query: SearchAccountDto) {
     return this.accountsService.getAccountList(query);
   }
 
   @Post('create')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
   @ApiBearerAuth()
   create(@Body() dto: CreateAccountDto) {
     return this.accountsService.createAccount(dto);
   }
 
   @Put('edit/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
   @ApiBearerAuth()
   editAccount(@Param() params: AccountIdDto, @Body() dto: UpdateAccountDto) {
     return this.accountsService.editAccount(params.id, dto);
   }
 
   @Delete('delete/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AccountRole.ADMIN)
   @ApiBearerAuth()
   deleteAccount(@Param() params: AccountIdDto) {
     return this.accountsService.deleteAccount(params.id);
