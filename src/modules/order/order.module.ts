@@ -9,6 +9,7 @@ import { PromotionLogModule } from '../promotion-log/promotion-log.module';
 import { Cart, CartSchema } from '../cart/schemas/cart.schema';
 import { Book, BookSchema } from '../book/schemas/book.schema';
 import { Stock, StockSchema } from '../stock/schemas/stock.schema';
+import { PaymentLogsModule } from '../payment-logs/payment-logs.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { Stock, StockSchema } from '../stock/schemas/stock.schema';
       { name: Stock.name, schema: StockSchema },
     ]),
     PromotionLogModule,
+    PaymentLogsModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],
