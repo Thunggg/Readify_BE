@@ -11,6 +11,7 @@ import { ErrorResponse } from 'src/shared/responses/error.response';
 import { AccountRole } from '../staff/constants/staff.enum';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
@@ -19,6 +20,7 @@ export class NotificationsService {
     private readonly notificationModel: Model<NotificationDocument>,
     @InjectModel(NotificationRead.name)
     private readonly notificationReadModel: Model<NotificationReadDocument>,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async createNotification(dto: CreateNotificationDto, currentUserId: string) {
@@ -45,6 +47,13 @@ export class NotificationsService {
 
     const notificationData = notification.toObject();
 
+    // EMIT TO SOCKET
+    this.notificationsGateway.sendNotificationToUser(currentUserId, {
+      ...notificationData,
+      isRead: false,
+      readAt: null,
+    });
+
     return new SuccessResponse(notificationData, 'Tạo thông báo thành công', 201);
   }
 
@@ -53,74 +62,64 @@ export class NotificationsService {
 
     // PAGINATION
     const validPage = Math.max(1, page);
-    const validLimit = Math.min(50, Math.max(1, limit));
+    const validLimit = Math.min(250, Math.max(1, limit));
     const skip = (validPage - 1) * validLimit;
 
     const currentUserIdObj = new Types.ObjectId(currentUserId);
 
-    // BASE FILTER
-    const baseFilter: any = {
+    // MATCH STAGE
+    const match: any = {
       createdBy: currentUserIdObj,
       isActive: true,
     };
 
     if (type) {
-      baseFilter.type = type;
+      match.type = type;
     }
 
-    // HANDLE isRead FILTER
-    let notificationIdsFilter: Types.ObjectId[] | null = null;
+    // AGGREGATION PIPELINE
+    const pipeline: any[] = [
+      { $match: match },
+      {
+        $lookup: {
+          from: (this.notificationReadModel as any).collection.name,
+          let: { notificationId: '$_id', userId: currentUserIdObj },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$notificationId', '$$notificationId'] },
+                    { $eq: ['$userId', '$$userId'] },
+                    { $ne: ['$isDeleted', true] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'readStatus',
+        },
+      },
+      {
+        $addFields: {
+          isRead: { $gt: [{ $size: '$readStatus' }, 0] },
+          readAt: { $arrayElemAt: ['$readStatus.readAt', 0] },
+        },
+      },
+    ];
 
+    // HANDLE isRead FILTER IN PIPELINE
     if (isRead !== undefined) {
-      if (isRead === true) {
-        // Get all read notification IDs
-        const readRecords = await this.notificationReadModel
-          .find({ userId: currentUserIdObj })
-          .select('notificationId')
-          .lean();
-        notificationIdsFilter = readRecords.map((r) => r.notificationId as Types.ObjectId);
-      } else {
-        // Get all notification IDs
-        const allNotifications = await this.notificationModel.find(baseFilter).select('_id').lean();
-        const allNotificationIds = allNotifications.map((n) => n._id as Types.ObjectId);
-
-        // Get read notification IDs
-        const readRecords = await this.notificationReadModel
-          .find({ userId: currentUserIdObj })
-          .select('notificationId')
-          .lean();
-        const readNotificationIds = new Set(readRecords.map((r) => r.notificationId.toString()));
-
-        // Filter out read notifications
-        notificationIdsFilter = allNotificationIds.filter((id) => !readNotificationIds.has(id.toString()));
-      }
-
-      // If no notifications match the isRead filter, return empty result
-      if (notificationIdsFilter.length === 0) {
-        return new PaginatedResponse(
-          [],
-          {
-            page: validPage,
-            limit: validLimit,
-            total: 0,
-          },
-          'Lấy danh sách thông báo thành công',
-        );
-      }
-
-      baseFilter._id = { $in: notificationIdsFilter };
+      pipeline.push({ $match: { isRead: isRead === true } });
     }
 
-    // QUERY NOTIFICATIONS
-    const [items, total] = await Promise.all([
-      this.notificationModel
-        .find(baseFilter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(validLimit)
-        .populate('relatedOrderId', 'orderCode status')
-        .populate('relatedPromotionId', 'code name')
-        .select({
+    // SORT, SKIP, LIMIT
+    pipeline.push(
+      { $sort: { createdAt: -1 as 1 | -1, _id: 1 as 1 | -1 } },
+      { $skip: skip },
+      { $limit: validLimit },
+      {
+        $project: {
           _id: 1,
           createdBy: 1,
           title: 1,
@@ -130,39 +129,50 @@ export class NotificationsService {
           relatedPromotionId: 1,
           createdAt: 1,
           updatedAt: 1,
-        })
-        .lean(),
+          isRead: 1,
+          readAt: 1,
+        },
+      },
+    );
 
-      this.notificationModel.countDocuments(baseFilter),
+    // EXECUTE AGGREGATION AND COUNT
+    const [items, total] = await Promise.all([
+      this.notificationModel.aggregate(pipeline).exec(),
+      this.notificationModel.countDocuments(match), // Note: total count might be wrong if isRead filter is applied, but standard is to count base match
     ]);
-
-    // GET READ STATUS FOR EACH NOTIFICATION
-    const notificationIds = items.map((item) => item._id);
-    const readRecords = await this.notificationReadModel
-      .find({
-        notificationId: { $in: notificationIds },
-        userId: currentUserIdObj,
-      })
-      .lean();
-
-    const readMap = new Map(readRecords.map((record) => [record.notificationId.toString(), record.readAt]));
-
-    // ADD isRead AND readAt TO EACH ITEM
-    const itemsWithReadStatus = items.map((item) => {
-      const readAt = readMap.get(item._id.toString());
-      return {
-        ...item,
-        isRead: !!readAt,
-        readAt: readAt || null,
-      };
-    });
+    
+    // If isRead filter is applied, we might need a separate count or use $facet in pipeline
+    // For simplicity and alignment with PaginatedResponse expectations, we'll keep countDocuments(match) 
+    // but if we want accurate total for filtered isRead, we'd need another aggregation or facet.
+    
+    let finalTotal = total;
+    if (isRead !== undefined) {
+      const countPipeline = [
+        { $match: match },
+        {
+          $lookup: {
+            from: (this.notificationReadModel as any).collection.name,
+            let: { notificationId: '$_id', userId: currentUserIdObj },
+            pipeline: [
+              { $match: { $expr: { $and: [{ $eq: ['$notificationId', '$$notificationId'] }, { $eq: ['$userId', '$$userId'] }, { $ne: ['$isDeleted', true] }] } } },
+            ],
+            as: 'readStatus',
+          },
+        },
+        { $addFields: { isRead: { $gt: [{ $size: '$readStatus' }, 0] } } },
+        { $match: { isRead: isRead === true } },
+        { $count: 'total' }
+      ];
+      const countResult = await this.notificationModel.aggregate(countPipeline).exec();
+      finalTotal = countResult[0]?.total || 0;
+    }
 
     return new PaginatedResponse(
-      itemsWithReadStatus,
+      items,
       {
         page: validPage,
         limit: validLimit,
-        total,
+        total: finalTotal,
       },
       'Lấy danh sách thông báo thành công',
     );
@@ -383,18 +393,15 @@ export class NotificationsService {
   }
 
   async getAdminNotificationsList(query: AdminListNotificationsDto) {
-    // Role check is handled by @Roles(AccountRole.ADMIN) decorator in controller
-    // Only admin can reach this point
-
     const { userId, type, isRead, page = 1, limit = 10 } = query;
 
     // PAGINATION
     const validPage = Math.max(1, page);
-    const validLimit = Math.min(50, Math.max(1, limit));
+    const validLimit = Math.min(250, Math.max(1, limit));
     const skip = (validPage - 1) * validLimit;
 
-    // BASE FILTER
-    const baseFilter: any = {
+    // MATCH STAGE
+    const match: any = {
       isActive: true,
     };
 
@@ -405,70 +412,72 @@ export class NotificationsService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      baseFilter.createdBy = new Types.ObjectId(userId);
+      match.createdBy = new Types.ObjectId(userId);
     }
 
     if (type) {
-      baseFilter.type = type;
+      match.type = type;
     }
 
-    // HANDLE isRead FILTER (if userId is provided)
-    let notificationIdsFilter: Types.ObjectId[] | null = null;
+    // AGGREGATION PIPELINE
+    const pipeline: any[] = [
+      { $match: match },
+      {
+        $lookup: {
+          from: 'accounts',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+        },
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: (this.notificationReadModel as any).collection.name,
+          let: { notificationId: '$_id', userId: userId ? new Types.ObjectId(userId) : '$createdBy._id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$notificationId', '$$notificationId'] },
+                    { $eq: ['$userId', '$$userId'] },
+                    { $ne: ['$isDeleted', true] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'readStatus',
+        },
+      },
+      {
+        $addFields: {
+          isRead: { $gt: [{ $size: '$readStatus' }, 0] },
+          readAt: { $arrayElemAt: ['$readStatus.readAt', 0] },
+        },
+      },
+    ];
 
+    // HANDLE isRead FILTER IN PIPELINE (only if userId is provided)
     if (isRead !== undefined && userId) {
-      const userIdObj = new Types.ObjectId(userId);
-      if (isRead === true) {
-        // Get all read notification IDs for this user
-        const readRecords = await this.notificationReadModel
-          .find({ userId: userIdObj })
-          .select('notificationId')
-          .lean();
-        notificationIdsFilter = readRecords.map((r) => r.notificationId as Types.ObjectId);
-      } else {
-        // Get all notification IDs for this user
-        const allNotifications = await this.notificationModel.find(baseFilter).select('_id').lean();
-        const allNotificationIds = allNotifications.map((n) => n._id as Types.ObjectId);
-
-        // Get read notification IDs
-        const readRecords = await this.notificationReadModel
-          .find({ userId: userIdObj })
-          .select('notificationId')
-          .lean();
-        const readNotificationIds = new Set(readRecords.map((r) => r.notificationId.toString()));
-
-        // Filter out read notifications
-        notificationIdsFilter = allNotificationIds.filter((id) => !readNotificationIds.has(id.toString()));
-      }
-
-      // If no notifications match the isRead filter, return empty result
-      if (notificationIdsFilter.length === 0) {
-        return new PaginatedResponse(
-          [],
-          {
-            page: validPage,
-            limit: validLimit,
-            total: 0,
-          },
-          'Lấy danh sách thông báo thành công',
-        );
-      }
-
-      baseFilter._id = { $in: notificationIdsFilter };
+      pipeline.push({ $match: { isRead: isRead === true } });
     }
 
-    // QUERY NOTIFICATIONS
-    const [items, total] = await Promise.all([
-      this.notificationModel
-        .find(baseFilter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(validLimit)
-        .populate('createdBy', 'email firstName lastName')
-        .populate('relatedOrderId', 'orderCode status totalAmount finalAmount')
-        .populate('relatedPromotionId', 'code name discountType discountValue')
-        .select({
+    // SORT, SKIP, LIMIT
+    pipeline.push(
+      { $sort: { createdAt: -1 as 1 | -1, _id: 1 as 1 | -1 } },
+      { $skip: skip },
+      { $limit: validLimit },
+      {
+        $project: {
           _id: 1,
-          createdBy: 1,
+          createdBy: {
+            _id: 1,
+            email: 1,
+            firstName: 1,
+            lastName: 1,
+          },
           title: 1,
           content: 1,
           type: 1,
@@ -477,51 +486,46 @@ export class NotificationsService {
           metadata: 1,
           createdAt: 1,
           updatedAt: 1,
-        })
-        .lean() as any,
+          isRead: 1,
+          readAt: 1,
+        },
+      },
+    );
 
-      this.notificationModel.countDocuments(baseFilter),
+    // EXECUTE AGGREGATION AND COUNT
+    const [items, total] = await Promise.all([
+      this.notificationModel.aggregate(pipeline).exec(),
+      this.notificationModel.countDocuments(match),
     ]);
-
-    // GET READ STATUS FOR EACH NOTIFICATION (if userId is provided)
-    let itemsWithReadStatus: any[] = items;
-    if (userId) {
-      const notificationIds = items.map((item: any) => item._id as Types.ObjectId);
-      const userIdObj = new Types.ObjectId(userId);
-      const readRecords = await this.notificationReadModel
-        .find({
-          notificationId: { $in: notificationIds },
-          userId: userIdObj,
-        })
-        .lean();
-
-      const readMap = new Map(readRecords.map((record) => [record.notificationId.toString(), record.readAt]));
-
-      itemsWithReadStatus = items.map((item: any) => {
-        const readAt = readMap.get(item._id.toString());
-        return new SuccessResponse(
-          {
-            ...item,
-            isRead: !!readAt,
-            readAt: readAt || null,
+    
+    let finalTotal = total;
+    if (isRead !== undefined && userId) {
+      const countPipeline = [
+        { $match: match },
+        {
+          $lookup: {
+            from: (this.notificationReadModel as any).collection.name,
+            let: { notificationId: '$_id', userId: new Types.ObjectId(userId) },
+            pipeline: [
+              { $match: { $expr: { $and: [{ $eq: ['$notificationId', '$$notificationId'] }, { $eq: ['$userId', '$$userId'] }, { $ne: ['$isDeleted', true] }] } } },
+            ],
+            as: 'readStatus',
           },
-          'Lấy danh sách thông báo thành công',
-          200,
-        );
-      });
-    } else {
-      // If no userId filter, mark all as not read (admin view)
-      itemsWithReadStatus = items.map(
-        (item: any) => new SuccessResponse(item, 'Lấy danh sách thông báo thành công', 200),
-      );
+        },
+        { $addFields: { isRead: { $gt: [{ $size: '$readStatus' }, 0] } } },
+        { $match: { isRead: isRead === true } },
+        { $count: 'total' }
+      ];
+      const countResult = await this.notificationModel.aggregate(countPipeline).exec();
+      finalTotal = countResult[0]?.total || 0;
     }
 
     return new PaginatedResponse(
-      itemsWithReadStatus,
+      items,
       {
         page: validPage,
         limit: validLimit,
-        total,
+        total: finalTotal,
       },
       'Lấy danh sách thông báo thành công',
     );

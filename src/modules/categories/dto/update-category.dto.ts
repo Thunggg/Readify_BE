@@ -11,5 +11,9 @@ export class UpdateCategoryDto {
   @IsString()
   @MaxLength(500, { message: 'Description must be less than 500 characters long' })
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
 }
 

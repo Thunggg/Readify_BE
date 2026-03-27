@@ -22,6 +22,14 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 export class IncomeController {
   constructor(private readonly incomeService: IncomeService) {}
 
+  @Get('ai-summary')
+  async getAiSummary(
+    @Query() query: IncomeStatisticsDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<SuccessResponse<unknown>> {
+    return this.incomeService.getAiSummary(query, req.user.userId);
+  }
+
   @Get('overview')
   async getOverview(@Req() req: AuthenticatedRequest): Promise<SuccessResponse<unknown>> {
     const response = await this.incomeService.getOverviewStats(req.user.userId);

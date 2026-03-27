@@ -11,6 +11,10 @@ export class NotificationMetadataDto {
   bookId?: string;
 
   @IsOptional()
+  @IsMongoId()
+  reviewId?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200, { message: 'Additional info must be less than 200 characters' })
   additionalInfo?: string;

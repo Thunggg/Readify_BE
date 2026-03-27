@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { IncomeController } from './income.controller';
 import { IncomeService } from './income.service';
 import { ViewIncomeService } from './services/view.income.service';
+import { AiIncomeService } from './services/ai.income.service';
 import { Order, OrderSchema } from '../order/schemas/order.schema';
 import { Book, BookSchema } from '../book/schemas/book.schema';
 import { Category, CategorySchema } from '../categories/schemas/category.schema';
@@ -18,7 +19,7 @@ import { Account, AccountSchema } from '../accounts/schemas/account.schema';
     ]),
   ],
   controllers: [IncomeController],
-  providers: [IncomeService, ViewIncomeService],
+  providers: [IncomeService, ViewIncomeService, AiIncomeService],
   exports: [IncomeService],
 })
 export class IncomeModule {}

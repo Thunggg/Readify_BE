@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { NotificationsGateway } from './notifications.gateway';
 import { Notification, NotificationSchema } from './schemas/notification.schema';
 import { NotificationRead, NotificationReadSchema } from './schemas/notification-read.schema';
 import { JwtUtil } from '../../shared/utils/jwt';
@@ -16,7 +17,7 @@ import { JwtUtil } from '../../shared/utils/jwt';
     JwtModule.register({}),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, JwtUtil],
+  providers: [NotificationsService, NotificationsGateway, JwtUtil],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

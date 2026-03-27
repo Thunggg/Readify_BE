@@ -38,7 +38,7 @@ export class ListCategoriesDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(50)
+  @Max(250)
   limit: number = 10;
 }
 
