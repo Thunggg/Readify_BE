@@ -6,10 +6,13 @@ import { BulkRemoveDto } from './dto/bulk-remove.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('wishlist')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(0) // Chỉ customer (role = 0) mới có thể sử dụng wishlist
+@ApiTags('Wishlist')
+@ApiBearerAuth()
 export class WishlistController {
   constructor(private readonly wishlistService: WishlistService) {}
 

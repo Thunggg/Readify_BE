@@ -25,6 +25,9 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { BlogModule } from './modules/blog/blog.module';
+import { IncomeModule } from './modules/income/income.module';
+import { CollectionsModule } from './modules/collections/collections.module';
+import { PaymentLogsModule } from './modules/payment-logs/payment-logs.module';
 
 @Module({
   imports: [
@@ -54,6 +57,9 @@ import { BlogModule } from './modules/blog/blog.module';
     ReviewsModule,
     TicketsModule,
     BlogModule,
+    IncomeModule,
+    CollectionsModule,
+    PaymentLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,162 @@
+[33m01f79e7[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/blog[m[33m, [m[1;31morigin/feature/blog[m[33m)[m refactor(blog): translate comments and success messages to English for consistency
+[33mbbb511f[m refactor(accounts): improve account filtering and sorting logic, add pagination constants
+[33m3254f8a[m fix(auth): clear refreshToken cookie on logout and tidy up code formatting
+[33m16373cd[m feat: implement account registration functionality in auth module
+[33m01f8541[m feat: add phone number existence check during account registration
+[33mefd8adb[m update stock and supplier services
+[33m3fb1d0c[m feat(blog): add blog module with posts, comments, and categories functionality
+[33m9ea4dc8[m[33m ([m[1;32mfeature/homepage-book-detail[m[33m)[m feat: enhance BooksPublicService and CloudinaryService with improved comments and error handling; update MediaService and StaffService for better functionality and clarity
+[33m8e7f98e[m feat(staff): change default sort order to ascending for staff list
+[33m9fbc994[m feat: enhance accounts and staff services with improved data handling and validation
+[33mbd91ace[m Merge branch 'dev' of https://github.com/Thunggg/Readify_BE into feature/homepage-book-detail
+[33md10ab3a[m Merge pull request #50 from Thunggg/feature/wishlist-CRUD
+[33mf2ac4bd[m Merge branch 'dev' into feature/wishlist-CRUD
+[33mca30640[m feat(staff): enhance staff DTOs and service with improved validation and role handling
+[33mfff0f06[m fix: resolve book admin service conflict
+[33m1ec845f[m fix(book): add book logic and data handling
+[33mb8ddc22[m Modify: fixbug and validate cart, stock and wishlist BE
+[33m7665204[m feat: implement refresh token functionality in authentication module
+[33m9aff2b8[m refactor: remove uploads module and update media handling
+[33m5cb5282[m fix: improve password validation error handling in accounts service and DTO
+[33m2dcdf2e[m feat: add bio field and improve validations in account DTOs
+[33mbadf975[m feat: add author schema
+[33m4f88bbc[m feat: enhance account and book services with new validations and properties
+[33me7c41e2[m refactor: remove legacy password hashing and account verification scripts
+[33ma7bdc21[m Merge pull request #52 from Thunggg/feature/fix-order-manager
+[33m3474ff8[m[33m ([m[1;31morigin/feature/fix-order-manager[m[33m)[m Merge branch 'dev' into feature/fix-order-manager
+[33m23eeba8[m Merge pull request #51 from Thunggg/test/test-merge-from-Huy
+[33m2d6454c[m[33m ([m[1;31morigin/test/test-merge-from-Huy[m[33m)[m feat: implement authentication controller
+[33m3095fc8[m Add: Wishlist CRUD BE
+[33md58a758[m Merge pull request #49 from Thunggg/feature/notifications-improvements
+[33m06c3542[m[33m ([m[1;31morigin/feature/notifications-improvements[m[33m)[m Merge branch 'test/test-merge-from-Huy' into feature/notifications-improvements
+[33mf0185a2[m Delete src/modules/auth/auth.controller.ts
+[33m79213bc[m Delete BACKEND_FRONTEND_COMPATIBILITY_REVIEW.md
+[33m3aedbfc[m refactor(book-public): update public book response structure
+[33md1a431e[m refactor: improve notifications module
+[33mb7996c2[m feat: add sex filtering to account search with support for multiple statuses
+[33mbbbe551[m refactor: modularize account list retrieval with improved filtering and sorting methods
+[33mabdae26[m refactor: enhance account querying with aggregation pipeline and fullName sorting
+[33m54d424d[m[33m ([m[1;31morigin/feature/reviews-module[m[33m)[m refactor: Fix multiple issues based on code review feedback
+[33m7de9ca8[m refactor: update account editing method to use PUT and remove role from create account DTO
+[33m6976db8[m optimize: delete api-response
+[33m183e07a[m feature: new Error response and new custom class validation response
+[33mb791b1b[m Merge branch 'dev' of https://github.com/Thunggg/Readify_BE into dev
+[33m4e7fc10[m optimize: add response for class validator
+[33m110e47e[m feat: implement reviews module with star rating system
+[33m4b44396[m Merge pull request #41 from Thunggg/feature/CRUD-Cart
+[33m0c11741[m optimize: delete avata_url and delete optional validation
+[33m5e459a1[m[33m ([m[1;31morigin/feature/admin-only-delete-notifications[m[33m)[m feat: Enhance notification deletion with flexible permission system
+[33m0da2d40[m feat: Add comprehensive admin notification management system
+[33md1ea3e4[m feat: Implement admin-only notification deletion with role-based access control
+[33m8d4b093[m[33m ([m[1;31morigin/feature/security-fixes-and-enum-refactor[m[33m)[m feat: Security fixes and enum refactoring
+[33mac9fdc9[m new detailed commit message
+[33mc5d6cee[m done
+[33mc119c72[m tammuoi-boxen-mailamtiep
+[33mc72afc3[m optimize: clear file database
+[33mb96a412[m optimize: change logic + business rule of register and forgot password
+[33me714516[m Merge pull request #40 from Thunggg/feature/homepage-book-detail
+[33mb13b0be[m[33m ([m[1;31morigin/feature/CRUD-Cart[m[33m)[m Modify: Update check quantity in cart
+[33mdf6beed[m feat(book): add Supplier schema dependency
+[33md59e63b[m optimize: delete createdAt and updatedAt
+[33m5dd9f29[m Merge pull request #39 from Thunggg/feature/homepage-book-detail
+[33m998313e[m Merge pull request #35 from Thunggg/feature/CRUD-Cart
+[33mc5e3acb[m Merge branch 'dev' into feature/CRUD-Cart
+[33m4eda558[m refactor(book-schema): simplify pricing and inventory fields
+[33m5da16dd[m[33m ([m[1;31morigin/feature/notifications-categories-secure[m[33m)[m feat: add notifications module
+[33m0bfcfcc[m feature: add new logic for forgot password
+[33m2a95286[m fix: resolve TypeScript error for MONGODB_URI type
+[33mac51968[m fix: remove hardcoded MongoDB URI from scripts
+[33mcebf402[m feature: add new logic for register
+[33m22ba017[m optimize: add new filed for register
+[33m889c83e[m optimize: fix bug CORS in main
+[33mb8d97b1[m Add: Cart Item Selection BE
+[33m779fae6[m Merge branch 'dev' of github-ivanovv:Thunggg/Readify_BE into feature/CRUD-Cart
+[33maea9e05[m[33m ([m[1;31morigin/feature/categories-update[m[33m)[m merge: resolve conflicts in category and supplier schemas
+[33m19cac2c[m Detail Categories
+[33m624d2a8[m optimize: edit role for order and promotion log
+[33mf1fe4d2[m Merge pull request #23 from Thunggg/feature/order-manager
+[33m084dcc1[m[33m ([m[1;31morigin/feature/order-manager[m[33m)[m Merge branch 'dev' into feature/order-manager
+[33m8243f55[m optimize: optimize code promotion
+[33mdb9ddb1[m Merge branch 'dev' of github-ivanovv:Thunggg/Readify_BE into feature/CRUD-Cart
+[33m83b298f[m Add: add JwtAuthGuard, RolesGuard
+[33m22ec948[m Merge pull request #22 from Thunggg/main
+[33mca8abd2[m[33m ([m[1;31morigin/feature/categories[m[33m)[m Merge pull request #21 from Thunggg/dev
+[33me373ec5[m Merge pull request #19 from tinssss111/feature/view-promotion-list
+[33meae9030[m Merge branch 'main' into feature/view-promotion-list
+[33mb31b15e[m optimize: optimize code upload image
+[33m6e9470b[m feature: forgot password
+[33mae2d1c1[m feature: edit profile
+[33m98e17ad[m feature: add feature forgot password
+[33m4108bbb[m optimize: optimize query databse after send mail
+[33m66b953c[m feature: complete api otp and send mail
+[33m45c909c[m Merge pull request #18 from Thunggg/dev
+[33m68a38d5[m feature: add feature send mail
+[33m530e898[m Merge pull request #17 from Thunggg/main
+[33m898260b[m Merge pull request #16 from Thunggg/dev
+[33m8dfb70a[m Merge branch 'main' into dev
+[33m1f5c7ca[m Merge pull request #15 from Thunggg/feature/crud-account
+[33m8d3aaac[m[33m ([m[1;31morigin/feature/crud-account[m[33m)[m feature: add crud account
+[33mef5100d[m done-promotion-logs
+[33mcb94250[m feat: implement categories module
+[33m65d4b34[m done-order-manager
+[33md509d2c[m Merge pull request #14 from Thunggg/feature/CRUD-Cart
+[33m795c339[m Merge branch 'dev' into feature/CRUD-Cart
+[33mb561bb0[m Add: CRUD, Clear Cart BE
+[33ma46b559[m done-crud-promotion
+[33mc15d4e0[m Merge pull request #13 from Thunggg/feature/homepage-book-detail
+[33m5b166f1[m Merge branch 'dev' into feature/homepage-book-detail
+[33mead9c32[m[33m ([m[1;31morigin/feature/View-notifications-list[m[33m)[m Merge pull request #12 from Thunggg/dev
+[33m93fdc96[m feature: add cloudinary for upload
+[33md3d792e[m feature: add role permission for api
+[33m8939a34[m success view-promotions-list
+[33m6b71cc4[m feat(homepage-book-detail): add related books API by id and by slug
+[33m7b6e715[m feat(homepage-book-detail): add public book detail by id and slug
+[33m9210177[m[33m ([m[1;31morigin/feature/homepage-book-list[m[33m, [m[1;32mfeature/homepage-book-list[m[33m)[m feat(homepage-books): add search suggestions API
+[33m1f51f41[m feat(homepage-books): add public book list with search, sort, filter, pagination
+[33m6ec3e38[m[33m ([m[1;31morigin/feature/dashboard-books-crud[m[33m, [m[1;32mfeature/dashboard-books-crud[m[33m)[m feat(dashboard-books): restore book (soft delete)
+[33med546e5[m feat(dashboard-books): add get book by slug
+[33m456ce46[m feat(dashboard-books): add delete book functionality for admin
+[33m42ead25[m feat(dashboard-books): add update book functionality for admin
+[33me3d99fe[m feat(dashboard-books): add create book functionality for admin
+[33mc5df7ba[m[33m ([m[1;31morigin/feature/admin-books-dashboard[m[33m, [m[1;32mfeature/admin-books-dashboard[m[33m)[m feat(dashboard-books): add book detail view for dashboard
+[33me6cb82d[m feat(dashboard-books): add book list view for dashboard
+[33m9f43393[m[33m ([m[1;31morigin/feature/staff-crud[m[33m, [m[1;32mfeature/staff-crud[m[33m)[m chore: resolve merge conflicts
+[33m02ba458[m refactor(staff): prevent modifying admin accounts
+[33m39178da[m Merge pull request #11 from Thunggg/feature/ExportStock
+[33me641dc1[m[33m ([m[1;31morigin/feature/ExportStock[m[33m)[m Fixbug: Change Method name, and clean code CRUD-Search for Supplier, ViewList&Detail, Import-Export for Stock
+[33m124bd9c[m Merge pull request #10 from Thunggg/main
+[33mc8fc1ad[m[33m ([m[1;31morigin/feature-Notification-detail[m[33m)[m Merge pull request #9 from Thunggg/dev
+[33m9f6d472[m optimize: delete same package + optimize code staff
+[33m7f5a283[m[33m ([m[1;32mdev[m[33m)[m feature: add feature logout
+[33mc6f6286[m Merge pull request #6 from Thunggg/feature/staff-crud
+[33m3e2346e[m Merge branch 'dev' into feature/staff-crud
+[33m0f38aa9[m Merge pull request #8 from Thunggg/feature/ExportStock
+[33mfa2cba7[m Merge branch 'dev' into feature/staff-crud
+[33m6f531df[m Merge branch 'dev' into feature/ExportStock
+[33m1ef4e0c[m feat(staff): update staff status and role
+[33m6b5e2d6[m feat(staff): restore soft-deleted staff account
+[33m22feccf[m feature: add jwt guard and api get profile
+[33mec57b17[m feat(staff): soft delete staff via isDeleted flag
+[33m11d0b69[m feat(staff): edit staff account
+[33mf002dde[m feat(staff): add staff account
+[33mc145a8e[m[33m ([m[1;31morigin/feature/view-staff-detail[m[33m, [m[1;32mfeature/view-staff-detail[m[33m)[m feat(staff): add view staff detail
+[33mad46159[m[33m ([m[1;31morigin/feature/view-staffs-list[m[33m, [m[1;32mfeature/view-staffs-list[m[33m)[m refactor(staff): use account model for staff list with search, sort, and pagination
+[33m72acb59[m Add: Export Stock by Excel file BE
+[33m034680b[m[33m ([m[1;31morigin/feature/ImportStock[m[33m)[m Add: Import Stock by Excel file BE
+[33m2448459[m Add: Soft Delete Supplier BE
+[33ma50cb2a[m Add: Search Supplier BE
+[33m33266dd[m Add: Update Supplier BE
+[33meff4a57[m Add: Add supplier BE
+[33ma8005c6[m Add: View Supplier Detail BE
+[33mcf3228d[m[33m ([m[1;31morigin/feature/ViewSuppliersList[m[33m)[m Add: ViewSupplierList BE
+[33m845cf39[m Merge branch 'main' of github-ivanovv:Thunggg/Readify_BE into feature/ImportStock
+[33m4cad3fd[m feat: add view staff list with search and sort
+[33mf90c178[m[33m ([m[1;32mmain[m[33m)[m optimize: optimize response
+[33macf2e48[m feature: add feature register
+[33meb7f918[m custom response
+[33mc0ff3d0[m Refactor AppService to use ConfigService for environment configuration and remove deprecated config file
+[33mc746728[m config database
+[33mfbee6f8[m[33m ([m[1;31morigin/feature/viewStockDetail[m[33m)[m Add: View Stock Detail BE
+[33maac1f64[m[33m ([m[1;31morigin/feature/viewStockList[m[33m)[m Add: View Stock List BE
+[33m25cefd0[m config eslint and config env
+[33m56eaa2a[m Initial project

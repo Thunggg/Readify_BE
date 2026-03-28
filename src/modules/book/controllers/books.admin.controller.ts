@@ -5,7 +5,10 @@ import { BookIdDto } from '../dto/book-id.dto';
 import { BookSlugDto } from '../dto/book-slug.dto';
 import { CreateBookDto } from '../dto/create-book.dto';
 import { UpdateBookDto } from '../dto/update-book.dto';
+import { TrendingRecommendationsDto } from '../dto/trending-recommendations.dto';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Books (Admin)')
 @Controller('admin/book')
 export class BooksAdminController {
   constructor(private readonly booksAdminService: BooksAdminService) {}
@@ -18,6 +21,11 @@ export class BooksAdminController {
   @Get('slug/:slug')
   getBookBySlug(@Param() params: BookSlugDto) {
     return this.booksAdminService.getBookBySlug(params.slug);
+  }
+
+  @Get('recommendations/trending')
+  getTrendingRecommendations(@Query() query: TrendingRecommendationsDto) {
+    return this.booksAdminService.getTrendingRecommendations(query);
   }
 
   @Get(':id')

@@ -18,6 +18,18 @@ export class BlogComment {
   user: Types.ObjectId;
 
   /**
+   * Tên hiển thị của người bình luận (bắt buộc với khách)
+   */
+  @Prop({ required: true })
+  authorName: string;
+
+  /**
+   * Email của người bình luận (bắt buộc với khách)
+   */
+  @Prop({ required: true })
+  authorEmail: string;
+
+  /**
    * Nội dung bình luận (bắt buộc)
    */
   @Prop({ required: true })

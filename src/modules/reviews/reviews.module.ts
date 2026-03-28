@@ -4,6 +4,7 @@ import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 import { Review, ReviewSchema } from './schemas/review.schema';
 import { Book, BookSchema } from '../book/schemas/book.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { Book, BookSchema } from '../book/schemas/book.schema';
       { name: Review.name, schema: ReviewSchema },
       { name: Book.name, schema: BookSchema },
     ]),
+    NotificationsModule,
   ],
   controllers: [ReviewsController],
   providers: [ReviewsService],

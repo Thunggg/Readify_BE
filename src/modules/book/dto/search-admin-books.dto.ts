@@ -1,5 +1,5 @@
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class SearchAdminBooksDto {
   // SEARCH
@@ -21,7 +21,17 @@ export class SearchAdminBooksDto {
   status?: number;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Type(() => String)
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    return value;
+  })
   @IsBoolean()
   isDeleted?: boolean;
 

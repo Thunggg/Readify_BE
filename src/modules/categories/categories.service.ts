@@ -9,6 +9,8 @@ import { ErrorResponse } from 'src/shared/responses/error.response';
 import { SuccessResponse } from 'src/shared/responses/success.response';
 import { PaginatedResponse } from 'src/shared/responses/paginated.response';
 
+import slugify from 'slugify';
+
 @Injectable()
 export class CategoriesService {
   constructor(
@@ -40,12 +42,22 @@ export class CategoriesService {
       );
     }
 
-    const category = await this.categoryModel.create({
+    // Generate slug
+    const slug = slugify(name, {
+      lower: true,
+      locale: 'vi',
+      strict: true,
+    });
+
+    const category = new this.categoryModel({
       name,
+      slug,
       description: dto.description?.trim(),
+      parentId: dto.parentId ? new Types.ObjectId(dto.parentId) : null,
       isDeleted: false,
     });
 
+    await category.save();
     const categoryData = category.toObject();
 
     return new SuccessResponse(categoryData, 'Tạo danh mục thành công', 201);
@@ -56,52 +68,63 @@ export class CategoriesService {
 
     // PAGINATION
     const validPage = Math.max(1, page);
-    const validLimit = Math.min(50, Math.max(1, limit));
+    const validLimit = Math.min(250, Math.max(1, limit));
     const skip = (validPage - 1) * validLimit;
 
-    // FILTER
-    const filter: any = {
+    // BASE FILTER
+    const match: any = {
       isDeleted: { $ne: true },
     };
 
     // SEARCH
     if (q?.trim()) {
       const searchTerm = q.trim();
-      filter.$or = [
+      match.$or = [
         { name: { $regex: searchTerm, $options: 'i' } },
         { description: { $regex: searchTerm, $options: 'i' } },
       ];
     }
 
     // SORT
-    const sortMap: Record<string, any> = {
-      [CategorySortBy.CREATED_AT]: { createdAt: order === SortOrder.ASC ? 1 : -1 },
-      [CategorySortBy.UPDATED_AT]: { updatedAt: order === SortOrder.ASC ? 1 : -1 },
-      [CategorySortBy.NAME]: { name: order === SortOrder.ASC ? 1 : -1 },
+    const sortFieldMap: Record<string, string> = {
+      [CategorySortBy.CREATED_AT]: 'createdAt',
+      [CategorySortBy.UPDATED_AT]: 'updatedAt',
+      [CategorySortBy.NAME]: 'name',
     };
+    const sortField = sortFieldMap[sortBy] || 'createdAt';
+    const sortOrder: 1 | -1 = order === SortOrder.ASC ? 1 : -1;
 
-    const sort = {
-      ...(sortMap[sortBy] ?? { createdAt: -1 }),
-      _id: 1,
-    };
-
-    // QUERY
-    const [items, total] = await Promise.all([
-      this.categoryModel
-        .find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(validLimit)
-        .select({
+    // AGGREGATION PIPELINE
+    const pipeline: any[] = [
+      { $match: match },
+      {
+        $lookup: {
+          from: 'books',
+          localField: '_id',
+          foreignField: 'categoryIds',
+          as: 'books',
+        },
+      },
+      {
+        $project: {
           _id: 1,
           name: 1,
+          slug: 1,
           description: 1,
+          parentId: 1,
+          bookCount: { $size: '$books' },
           createdAt: 1,
           updatedAt: 1,
-        })
-        .lean(),
+        },
+      },
+      { $sort: { [sortField]: sortOrder, _id: 1 } },
+      { $skip: skip },
+      { $limit: validLimit },
+    ];
 
-      this.categoryModel.countDocuments(filter),
+    const [items, total] = await Promise.all([
+      this.categoryModel.aggregate(pipeline).exec(),
+      this.categoryModel.countDocuments(match),
     ]);
 
     return new PaginatedResponse(
@@ -193,6 +216,10 @@ export class CategoriesService {
 
     if (dto.description !== undefined) {
       category.description = dto.description.trim();
+    }
+    
+    if (dto.parentId !== undefined) {
+      category.parentId = dto.parentId ? new Types.ObjectId(dto.parentId) : null;
     }
 
     const saved = await category.save();

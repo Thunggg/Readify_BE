@@ -8,45 +8,15 @@ import { ConfigService } from '@nestjs/config';
 import { RegisterAccountDto } from './dto/register-account.dto';
 import { OtpPurpose } from '../otp/enum/otp-purpose.enum';
 import { SuccessResponse } from 'src/shared/responses/success.response';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('auth')
+@ApiTags('Auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {}
-
-  private setOtpCookies(res: Response, email: string, purpose: OtpPurpose) {
-    res.cookie('otpEmail', email, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: 15 * 60 * 1000,
-      path: '/',
-    });
-    res.cookie('otpPurpose', purpose, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: 15 * 60 * 1000,
-      path: '/',
-    });
-  }
-
-  // POST /auth/register
-  @HttpCode(HttpStatus.OK)
-  @Post('register')
-  async register(
-    @Body() dto: RegisterAccountDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<SuccessResponse<null>> {
-    const response: SuccessResponse<null> = await this.authService.register(dto);
-
-    const email = dto.email.trim().toLowerCase();
-    this.setOtpCookies(res, email, OtpPurpose.VERIFY_EMAIL);
-
-    return response;
-  }
 
   private setOtpCookies(res: Response, email: string, purpose: OtpPurpose) {
     res.cookie('otpEmail', email, {
@@ -91,11 +61,14 @@ export class AuthController {
 
     const { accessToken, refreshToken } = response.data;
 
+    const accessTokenTtl = this.configService.get<number>('jwt.accessTokenExpiresIn') ?? 3600;
+    const refreshTokenTtl = this.configService.get<number>('jwt.refreshTokenExpiresIn') ?? 86400;
+
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       sameSite: 'lax', // dev OK
       secure: false, // true khi HTTPS
-      maxAge: 10 * 1000, // 10 giây
+      maxAge: accessTokenTtl * 1000,
       path: '/',
     });
 
@@ -113,9 +86,13 @@ export class AuthController {
   // POST /auth/logout
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post('logout')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    const response = await this.authService.logout(req?.cookies?.accessToken as string);
+    const response = await this.authService.logout(
+      req?.cookies?.accessToken as string,
+      req?.cookies?.refreshToken as string,
+    );
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
     return response;

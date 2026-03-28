@@ -37,6 +37,15 @@ export class Review {
   @Prop({ default: 0, min: 0 })
   helpfulCount: number; // Số người đánh giá hữu ích
 
+  @Prop({ trim: true, maxlength: 2000 })
+  adminReply?: string; // Phản hồi của admin
+
+  @Prop({ type: Date })
+  adminReplyAt?: Date; // Thời gian admin phản hồi
+
+  @Prop({ type: Types.ObjectId, ref: 'Account' })
+  adminReplyBy?: Types.ObjectId; // Admin đã phản hồi
+
   @Prop({ default: true, index: true })
   isActive: boolean;
 }

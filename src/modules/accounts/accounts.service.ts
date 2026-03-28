@@ -137,14 +137,25 @@ export class AccountsService {
       );
     }
 
+    if (dto.phone) {
+      const phone = dto.phone.trim();
+      const currentPhone = String(account.phone ?? '').trim();
+      if (phone !== currentPhone) {
+        const exists = await this.accountModel.exists({ phone, _id: { $ne: account._id } });
+        if (exists) {
+          throw new HttpException(new ErrorResponse('Phone number already exists', 'PHONE_ALREADY_EXISTS', 400), 400);
+        }
+      }
+    }
+
     if (dto.firstName !== undefined) account.firstName = dto.firstName.trim().replace(/\s+/g, ' ');
     if (dto.lastName !== undefined) account.lastName = dto.lastName.trim().replace(/\s+/g, ' ');
     if (dto.dateOfBirth !== undefined) account.dateOfBirth = dto.dateOfBirth;
-    if (dto.phone !== undefined) account.phone = dto.phone;
-    if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
-    if (dto.address !== undefined) account.address = dto.address;
+    if (dto.phone !== undefined) account.phone = dto.phone.trim().replace(/\s+/g, ' ');
+    if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl.trim().replace(/\s+/g, ' ');
+    if (dto.address !== undefined) account.address = dto.address.trim().replace(/\s+/g, ' ');
     if (dto.sex !== undefined) account.sex = dto.sex;
-    if (dto.bio !== undefined) account.bio = dto.bio;
+    if (dto.bio !== undefined) account.bio = dto.bio.trim().replace(/\s+/g, ' ');
 
     const saved = await account.save();
     const { password, ...accountData } = saved.toObject();
@@ -214,12 +225,24 @@ export class AccountsService {
   async createAccount(dto: CreateAccountDto) {
     const email = dto.email.trim().toLowerCase();
 
-    const isEmailExists = await this.accountModel.findOne({ email });
+    const [isEmailExists, isPhoneExists] = await Promise.all([
+      this.accountModel.findOne({ email }),
+      this.accountModel.findOne({ phone: dto.phone }),
+    ]);
 
     if (isEmailExists) {
       throw new HttpException(
         new ErrorResponse('Email already exists', 'EMAIL_ALREADY_EXISTS', 400, [
           { field: 'email', message: 'Email already exists' },
+        ]),
+        400,
+      );
+    }
+
+    if (isPhoneExists) {
+      throw new HttpException(
+        new ErrorResponse('Phone number already exists', 'PHONE_ALREADY_EXISTS', 400, [
+          { field: 'phone', message: 'Phone number already exists' },
         ]),
         400,
       );
@@ -261,7 +284,7 @@ export class AccountsService {
       throw new HttpException(new ErrorResponse('Account is not a user', 'ACCOUNT_NOT_A_USER', 400), 400);
     }
 
-    if (dto.email !== undefined) {
+    if (dto.email) {
       const email = dto.email.trim().toLowerCase();
       const exists = await this.accountModel.exists({ email, _id: { $ne: account._id } });
       if (exists) {
@@ -275,6 +298,26 @@ export class AccountsService {
       account.email = email;
     }
 
+    if (dto.phone) {
+      const phone = dto.phone.trim();
+      const currentPhone = String(account.phone ?? '').trim();
+
+      // Chỉ check uniqueness nếu phone thực sự thay đổi
+      if (phone !== currentPhone) {
+        const exists = await this.accountModel.exists({ phone, _id: { $ne: account._id } });
+        if (exists) {
+          throw new HttpException(
+            new ErrorResponse('Phone number already exists', 'PHONE_ALREADY_EXISTS', 400, [
+              { field: 'phone', message: 'Phone number already exists' },
+            ]),
+            400,
+          );
+        }
+      }
+
+      account.phone = phone;
+    }
+
     if (dto.password !== undefined) {
       account.password = await hashPassword(dto.password, Number(this.configService.get<number>('bcrypt.saltRounds')));
     }
@@ -282,7 +325,6 @@ export class AccountsService {
     if (dto.firstName !== undefined) account.firstName = dto.firstName.trim();
     if (dto.lastName !== undefined) account.lastName = dto.lastName.trim();
     if (dto.dateOfBirth !== undefined) account.dateOfBirth = dto.dateOfBirth;
-    if (dto.phone !== undefined) account.phone = dto.phone;
     if (dto.avatarUrl !== undefined) account.avatarUrl = dto.avatarUrl;
     if (dto.address !== undefined) account.address = dto.address;
     if (dto.status !== undefined) account.status = dto.status;
@@ -384,7 +426,7 @@ export class AccountsService {
 
     switch (sortBy) {
       case StaffSortBy.CREATED_AT:
-        sortStage = { createdAt: 1 };
+        sortStage = { createdAt: direction };
         break;
       case StaffSortBy.EMAIL:
         sortStage = { email: direction };
@@ -430,7 +472,8 @@ export class AccountsService {
       });
     }
 
-    pipeline.push(this.buildSortStage(sortBy, order), { $skip: skip }, { $limit: limit });
+    // Security: aggregation does NOT honor schema `select: false`, so explicitly remove password from results
+    pipeline.push({ $project: { password: 0 } }, this.buildSortStage(sortBy, order), { $skip: skip }, { $limit: limit });
 
     return pipeline;
   }
@@ -628,18 +671,20 @@ export class AccountsService {
       throw new HttpException(ErrorResponse.badRequest('Invalid session id'), HttpStatus.BAD_REQUEST);
     }
 
-    const session = await this.refreshTokenModel
-      .findOne({ _id: { $in: sessionId }, userId })
-      .select('token')
-      .lean();
+    // If currentToken is present, check whether it's among the sessions being revoked
+    const isCurrent =
+      !!currentToken &&
+      (await this.refreshTokenModel.exists({
+        _id: { $in: sessionId },
+        userId,
+        token: currentToken,
+      })) !== null;
 
-    if (!session) {
+    const deleted = await this.refreshTokenModel.deleteMany({ _id: { $in: sessionId }, userId });
+
+    if (!deleted.deletedCount) {
       throw new HttpException(ErrorResponse.notFound('Session not found'), HttpStatus.NOT_FOUND);
     }
-
-    const isCurrent = Boolean(currentToken) && session.token === currentToken;
-
-    await this.refreshTokenModel.deleteOne({ _id: sessionId, userId });
 
     return isCurrent;
   }
