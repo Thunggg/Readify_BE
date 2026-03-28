@@ -14,10 +14,15 @@ export class PaymentLogsController {
   constructor(private readonly paymentLogsService: PaymentLogsService) {}
 
   @Get('admin/all')
-  @Roles(AccountRole.ADMIN)
+  @Roles(AccountRole.ADMIN, AccountRole.SELLER, AccountRole.WAREHOUSE)
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'orderCode', required: false })
-  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'status', required: false, description: 'Payment log status' })
+  @ApiQuery({
+    name: 'orderStatus',
+    required: false,
+    description: 'Linked order status (e.g. CONFIRMED)',
+  })
   @ApiQuery({ name: 'paymentMethod', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -25,6 +30,7 @@ export class PaymentLogsController {
     @Query('userId') userId?: string,
     @Query('orderCode') orderCode?: string,
     @Query('status') status?: string,
+    @Query('orderStatus') orderStatus?: string,
     @Query('paymentMethod') paymentMethod?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -33,6 +39,7 @@ export class PaymentLogsController {
       userId,
       orderCode,
       status,
+      orderStatus,
       paymentMethod,
       page: Number(page) || 1,
       limit: Number(limit) || 10,

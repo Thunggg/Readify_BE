@@ -16,6 +16,7 @@ import { Cart, CartDocument } from '../cart/schemas/cart.schema';
 import { Book, BookDocument } from '../book/schemas/book.schema';
 import { Stock, StockDocument } from '../stock/schemas/stock.schema';
 import { PromotionLogService } from '../promotion-log/promotion-log.service';
+import { PaymentLogsService } from '../payment-logs/payment-logs.service';
 
 import { PaginatedResponse } from '../../shared/responses/paginated.response';
 import { SuccessResponse } from '../../shared/responses/success.response';
@@ -48,7 +49,34 @@ export class OrderService {
     @InjectConnection()
     private readonly connection: Connection,
     private readonly promotionLogService: PromotionLogService,
+    private readonly paymentLogsService: PaymentLogsService,
   ) {}
+
+  private async logPaymentForOrder(
+    order: any,
+    status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED',
+    performedBy: string,
+    metadata?: Record<string, any>,
+  ) {
+    const orderUserId = order.userId instanceof Types.ObjectId ? order.userId : new Types.ObjectId(order.userId);
+    const orderId = order._id instanceof Types.ObjectId ? order._id : new Types.ObjectId(order._id);
+
+    return this.paymentLogsService.logPayment({
+      userId: orderUserId,
+      orderId: orderId,
+      status,
+      paymentMethod: order.paymentMethod,
+      amount: order.finalAmount,
+      currency: 'VND',
+      metadata: {
+        orderCode: order.orderCode,
+        totalAmount: order.totalAmount,
+        discountAmount: order.discountAmount,
+        performedBy,
+        ...metadata,
+      },
+    });
+  }
 
   async getOrderList(query: SearchOrderDto, currentUser: string) {
     if (!Types.ObjectId.isValid(currentUser)) {
@@ -269,6 +297,32 @@ export class OrderService {
       .populate('promotionId', 'code name discountType discountValue')
       .lean();
 
+    // Log payment status changes
+    if (updatedOrder && updateData.status) {
+      const newStatus = updateData.status;
+
+      if (newStatus === 'CONFIRMED') {
+        // Order confirmed -> payment confirmed
+        await this.logPaymentForOrder(updatedOrder, 'PAID', currentUser, {
+          event: 'ORDER_CONFIRMED',
+          previousOrderStatus: currentStatus,
+        });
+      } else if (newStatus === 'COMPLETED') {
+        // Order completed -> payment finalized
+        await this.logPaymentForOrder(updatedOrder, 'PAID', currentUser, {
+          event: 'ORDER_COMPLETED',
+          previousOrderStatus: currentStatus,
+        });
+      } else if (newStatus === 'CANCELLED') {
+        // Order cancelled -> payment cancelled
+        await this.logPaymentForOrder(updatedOrder, 'CANCELLED', currentUser, {
+          event: 'ORDER_CANCELLED',
+          previousOrderStatus: currentStatus,
+          reason: 'Order was cancelled',
+        });
+      }
+    }
+
     return new SuccessResponse(updatedOrder, 'Order updated successfully');
   }
 
@@ -465,6 +519,13 @@ export class OrderService {
       }
 
       await session.commitTransaction();
+
+      // Log payment cancellation
+      await this.logPaymentForOrder(cancelledOrder, 'CANCELLED', currentUser, {
+        event: 'ORDER_CANCELLED_BY_CUSTOMER',
+        previousOrderStatus: order.status,
+        reason: 'Customer cancelled order',
+      });
 
       return new SuccessResponse(cancelledOrder, 'Order cancelled successfully');
     } catch (error) {
@@ -700,11 +761,21 @@ export class OrderService {
         { session },
       );
       await session.commitTransaction();
+
       const order = await this.orderModel
         .findById(newOrder._id)
         .populate('userId', 'firstName lastName email phone')
         .populate('promotionId', 'code name discountType discountValue')
         .lean();
+
+      // Log payment for newly created order
+      if (order) {
+        await this.logPaymentForOrder(order, 'PENDING', currentUser, {
+          event: 'ORDER_CREATED',
+          paymentStatus: order.paymentStatus,
+        });
+      }
+
       return new SuccessResponse(order, 'Order created from cart successfully');
     } catch (error) {
       await session.abortTransaction();
@@ -931,11 +1002,22 @@ export class OrderService {
       }
 
       await session.commitTransaction();
+
       const order = await this.orderModel
         .findById(newOrder._id)
         .populate('userId', 'firstName lastName email phone')
         .populate('promotionId', 'code name discountType discountValue')
         .lean();
+
+      // Log payment for reordered order
+      if (order) {
+        await this.logPaymentForOrder(order, 'PENDING', currentUser, {
+          event: 'ORDER_REORDERED',
+          previousOrderCode: previousOrder.orderCode,
+          paymentStatus: order.paymentStatus,
+        });
+      }
+
       return new SuccessResponse(order, `Order reordered from ${previousOrder.orderCode} successfully`);
     } catch (error) {
       await session.abortTransaction();
