@@ -46,7 +46,7 @@ export class BlogComment {
    */
   @Prop({
     default: 'pending',
-    enum: ['pending', 'approved', 'spam', 'rejected'],
+    enum: ['pending', 'approved', 'spam', 'rejected', 'deleted'],
   })
   status: string;
 
@@ -67,6 +67,12 @@ export class BlogComment {
    */
   @Prop({ default: null })
   deletedAt?: Date;
+
+  /**
+   * Timestamps do Mongoose tự sinh khi bật { timestamps: true }
+   */
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const BlogCommentSchema = SchemaFactory.createForClass(BlogComment);
